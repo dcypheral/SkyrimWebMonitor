@@ -42,13 +42,16 @@
           "illusion": "Иллюзия",
           "restoration": "Восстановление",
           "enchanting": "Чарование",
-          "shouts": "Крики"
+          "shouts": "Крики",
+          "spellbook": "Книга заклинаний",
+          "powers": "Способности"
         }
       },
       "quests": {
         "label": "Квесты",
         "subtabs": {
-          "questsList": "Журнал"
+          "questsList": "Задания",
+          "journal": "Журнал"
         }
       },
       "map": {
@@ -152,6 +155,10 @@
         "xp": "Опыт до следующего уровня",
         "gold": "Золото",
         "carry": "Переносимый вес"
+      },
+      "voice": {
+        "shouts": "Крики",
+        "powers": "Способности"
       }
     },
     "character": {
@@ -380,6 +387,161 @@
         "colWalked": "Пройдено",
         "colEvents": "События"
       }
+    },
+    "spellbook": {
+      "search": "Поиск заклинаний или эффектов",
+      "favorites": "Только избранное",
+      "all": "Все школы",
+      "noMatches": "Нет подходящих заклинаний.",
+      "empty": "Заклинаний пока нет.",
+      "left": "Левая рука",
+      "right": "Правая рука",
+      "bothHands": "Обеими руками",
+      "unequip": "Снять",
+      "cast": "Применение",
+      "delivery": "Цель",
+      "casting": {
+        "FireAndForget": "Мгновенное",
+        "Concentration": "Концентрация",
+        "ConstantEffect": "Постоянное",
+        "Scroll": "Свиток"
+      },
+      "deliveries": {
+        "Self": "На себя",
+        "Touch": "Касание",
+        "Aimed": "Направленное",
+        "TargetActor": "На цель",
+        "TargetLocation": "В точку"
+      },
+      "handShort": {
+        "left": "Л",
+        "right": "П",
+        "both": "Л+П"
+      },
+      "greater": "Великая сила",
+      "lesser": "Малая сила",
+      "greaterHint": "раз в день",
+      "lesserHint": "в любое время",
+      "noPowers": "Способностей нет.",
+      "useAsPower": "Назначить силой",
+      "inVoiceSlot": "В слоте силы"
+    },
+    "records": {
+      "needPlugin": "Общая статистика и активные эффекты требуют обновлённого плагина SkyrimWebSocket (функция \"player.records\").",
+      "waiting": "Ожидание данных…",
+      "noEffects": "Нет активных эффектов.",
+      "unknownSource": "Прочее",
+      "tabs": {
+        "effects": "Активные эффекты",
+        "General": "Общее",
+        "Quest": "Задания",
+        "Combat": "Бой",
+        "Magic": "Магия",
+        "Crafting": "Ремесло",
+        "Crime": "Преступления"
+      },
+      "stats": {
+        "LocationsDiscovered": "Открыто локаций",
+        "DungeonsCleared": "Зачищено подземелий",
+        "DaysPassed": "Прошло дней",
+        "HoursSlept": "Часов сна",
+        "HoursWaiting": "Часов ожидания",
+        "StandingStonesFound": "Найдено камней-хранителей",
+        "GoldFound": "Найдено золота",
+        "MostGoldCarried": "Больше всего золота",
+        "ChestsLooted": "Обыскано сундуков",
+        "SkillIncreases": "Повышений навыков",
+        "SkillBooksRead": "Прочитано учебников",
+        "FoodEaten": "Съедено еды",
+        "TrainingSessions": "Уроков у учителей",
+        "BooksRead": "Прочитано книг",
+        "HorsesOwned": "Лошадей",
+        "HousesOwned": "Домов",
+        "StoresInvestedIn": "Вложений в лавки",
+        "Barters": "Сделок",
+        "Persuasions": "Убеждений",
+        "Bribes": "Подкупов",
+        "Intimidations": "Запугиваний",
+        "DiseasesContracted": "Подхвачено болезней",
+        "DaysasaVampire": "Дней вампиром",
+        "DaysasaWerewolf": "Дней оборотнем",
+        "NecksBitten": "Укусов",
+        "VampirismCures": "Излечений вампиризма",
+        "WerewolfTransformations": "Превращений в оборотня",
+        "Mauls": "Растерзано",
+        "QuestsCompleted": "Выполнено заданий",
+        "MiscObjectivesCompleted": "Выполнено прочих целей",
+        "MainQuestsCompleted": "Заданий основного сюжета",
+        "SideQuestsCompleted": "Побочных заданий",
+        "TheCompanionsQuestsCompleted": "Заданий Соратников",
+        "CollegeofWinterholdQuestsCompleted": "Заданий Коллегии Винтерхолда",
+        "ThievesGuildQuestsCompleted": "Заданий Гильдии воров",
+        "TheDarkBrotherhoodQuestsCompleted": "Заданий Темного Братства",
+        "CivilWarQuestsCompleted": "Заданий гражданской войны",
+        "DaedricQuestsCompleted": "Даэдрических заданий",
+        "DawnguardQuestsCompleted": "Заданий Dawnguard",
+        "DragonbornQuestsCompleted": "Заданий Dragonborn",
+        "QuestlinesCompleted": "Пройдено сюжетных линий",
+        "PeopleKilled": "Убито людей",
+        "AnimalsKilled": "Убито животных",
+        "CreaturesKilled": "Убито существ",
+        "UndeadKilled": "Убито нежити",
+        "DaedraKilled": "Убито даэдра",
+        "AutomatonsKilled": "Убито механизмов",
+        "CriticalStrikes": "Критических ударов",
+        "SneakAttacks": "Скрытых атак",
+        "Backstabs": "Ударов в спину",
+        "WeaponsDisarmed": "Обезоружено",
+        "BrawlsWon": "Выиграно драк",
+        "BunniesSlaughtered": "Убито кроликов",
+        "SpellsLearned": "Изучено заклинаний",
+        "DragonSoulsCollected": "Поглощено душ драконов",
+        "WordsOfPowerLearned": "Изучено слов силы",
+        "WordsOfPowerUnlocked": "Открыто слов силы",
+        "ShoutsLearned": "Изучено криков",
+        "ShoutsUnlocked": "Открыто криков",
+        "ShoutsMastered": "Освоено криков",
+        "TimesShouted": "Использовано криков",
+        "SoulGemsUsed": "Использовано камней душ",
+        "SoulsTrapped": "Поймано душ",
+        "MagicItemsMade": "Зачаровано предметов",
+        "WeaponsImproved": "Улучшено оружия",
+        "WeaponsMade": "Создано оружия",
+        "ArmorImproved": "Улучшено доспехов",
+        "ArmorMade": "Создано доспехов",
+        "PotionsMixed": "Сварено зелий",
+        "PotionsUsed": "Выпито зелий",
+        "PoisonsMixed": "Сварено ядов",
+        "PoisonsUsed": "Использовано ядов",
+        "IngredientsHarvested": "Собрано ингредиентов",
+        "IngredientsEaten": "Съедено ингредиентов",
+        "NirnrootsFound": "Найдено корней Нирна",
+        "WingsPlucked": "Оторвано крыльев",
+        "TotalLifetimeBounty": "Общая сумма награды",
+        "LargestBounty": "Наибольшая награда",
+        "LocksPicked": "Вскрыто замков",
+        "PocketsPicked": "Обчищено карманов",
+        "ItemsPickpocketed": "Украдено из карманов",
+        "TimesJailed": "Раз в тюрьме",
+        "DaysJailed": "Дней в тюрьме",
+        "FinesPaid": "Уплачено штрафов",
+        "JailEscapes": "Побегов из тюрьмы",
+        "ItemsStolen": "Украдено предметов",
+        "Assaults": "Нападений",
+        "Murders": "Убийств",
+        "HorsesStolen": "Украдено лошадей",
+        "Trespasses": "Незаконных проникновений",
+        "EastmarchBounty": "Награда: Истмарк",
+        "FalkreathBounty": "Награда: Фолкрит",
+        "HaafingarBounty": "Награда: Хаафингар",
+        "HjaalmarchBounty": "Награда: Хьялмарк",
+        "ThePaleBounty": "Награда: Предел Белого",
+        "TheReachBounty": "Награда: Предел",
+        "TheRiftBounty": "Награда: Рифт",
+        "TribalOrcsBounty": "Награда: орки",
+        "WhiterunBounty": "Награда: Вайтран",
+        "WinterholdBounty": "Награда: Винтерхолд"
+      }
     }
   },
   "shared": {
@@ -425,7 +587,16 @@
         "inMainMenu": "Открыто главное меню.",
         "inDialogue": "Вы участвуете в диалоге.",
         "dead": "Вы погибли.",
-        "controlsDisabled": "Управление заблокировано."
+        "controlsDisabled": "Управление заблокировано.",
+        "short": {
+          "paused": "Пауза",
+          "loading": "Загрузка",
+          "inMainMenu": "Главное меню",
+          "inDialogue": "Разговор",
+          "dead": "Смерть",
+          "controlsDisabled": "Управление отключено",
+          "unavailable": "Действия недоступны"
+        }
       },
       "itemMenu": {
         "equip": "Экипировать",
@@ -473,6 +644,18 @@
           "none": "Нет реакции",
           "unknown": "Неизвестное зелье"
         }
+      },
+      "preview": {
+        "show": "Показать подробности",
+        "hide": "Скрыть подробности"
+      },
+      "viewer": {
+        "open": "Показать {name} в 3D",
+        "close": "Закрыть",
+        "hint": "Тяните, чтобы вращать · сведите пальцы для масштаба · двойное касание — сброс",
+        "loading": "Загрузка модели…",
+        "empty": "В этой модели нечего показать.",
+        "failed": "Не удалось загрузить модель: {reason}"
       }
     }
   },

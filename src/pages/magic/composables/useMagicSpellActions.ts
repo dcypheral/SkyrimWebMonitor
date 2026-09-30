@@ -2,11 +2,11 @@ import { ref, computed, watch } from 'vue';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useModal } from '@/shared/lib/composables/useModal';
 import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
+import { spellBinding } from '@/stores/hotkeys/lib/bindings';
 import { DataRouter } from '@/stores/adapters/dataRouter';
 import { HandPicker, HotkeyPickerModal } from '@/shared/ui';
 import type { SpellItem } from '@/stores/magic/lib/types';
 import type { EquipSlot } from '@/shared/lib/types';
-import type { HotkeySlot } from '@/api/websocket';
 import { isMasterLevelSpell } from '@/stores/magic/helpers';
 
 export function useMagicSpellActions(spellsList: () => SpellItem[]) {
@@ -117,13 +117,8 @@ export function useMagicSpellActions(spellsList: () => SpellItem[]) {
           itemName,
         },
         on: {
-          select: (slot: HotkeySlot) => {
-            const existing = hotkeysStore.getSlotForFormId(formId);
-            if (existing === slot) {
-              wsStore.sendCommand({ command: 'hotkey_clear', slot });
-            } else {
-              wsStore.sendCommand({ command: 'hotkey_set', formId, slot });
-            }
+          select: (slot: number) => {
+            hotkeysStore.toggle(slot, spellBinding(activeSpellData.value ?? undefined, formId, itemName));
             closeModal();
           },
         },

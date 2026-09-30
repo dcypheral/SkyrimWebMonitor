@@ -5,7 +5,6 @@ import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
 import { DataRouter } from '@/stores/adapters/dataRouter';
 import { HotkeyPickerModal } from '@/shared/ui';
 import type { ShoutItem } from '@/stores/magic/lib/types';
-import type { HotkeySlot } from '@/api/websocket';
 
 export function useMagicShoutActions(shoutsList: () => ShoutItem[]) {
   const wsStore = useWebSocketStore();
@@ -51,13 +50,8 @@ export function useMagicShoutActions(shoutsList: () => ShoutItem[]) {
           itemName,
         },
         on: {
-          select: (slot: HotkeySlot) => {
-            const existing = hotkeysStore.getSlotForFormId(formId);
-            if (existing === slot) {
-              wsStore.sendCommand({ command: 'hotkey_clear', slot });
-            } else {
-              wsStore.sendCommand({ command: 'hotkey_set', formId, slot });
-            }
+          select: (slot: number) => {
+            hotkeysStore.toggle(slot, { kind: 'spell', formId, name: itemName, spellType: 'Shout', school: 'None', cost: 0, level: 0, chargeTime: 0 });
             closeModal();
           },
         },

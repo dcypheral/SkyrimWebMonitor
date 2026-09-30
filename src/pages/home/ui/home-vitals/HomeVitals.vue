@@ -69,6 +69,20 @@
         />
         {{ carryText }}
       </span>
+
+      <!-- The home screen has no top bar, so settings live here. -->
+      <button
+        type="button"
+        class="vitals__settings"
+        :aria-label="t('app.settings.open')"
+        @click="openModal({ component: SettingsModalContent })"
+      >
+        <base-icon
+          icon-path="lorc/cog.svg"
+          :size="15"
+          background-color="var(--skyrim-text-dim)"
+        />
+      </button>
     </div>
   </div>
 </template>
@@ -80,8 +94,11 @@ import { useI18n } from 'vue-i18n';
 import { BaseIcon, StatBar } from '@/shared/ui';
 import { useCharacterStatsDisplay } from '@/pages/character/composables/useCharacterStatsDisplay';
 import { useCharacterStore } from '@/stores/character/useCharacterStore';
+import { useModal } from '@/shared/lib';
+import { SettingsModalContent } from '@/features/settings';
 
 const { t } = useI18n();
+const { openModal } = useModal();
 
 // Same order as the in-game HUD: magicka, health, stamina.
 const { healthPercentage, magickaPercentage, staminaPercentage } = useCharacterStatsDisplay();
@@ -194,6 +211,19 @@ const carryText = computed(() => {
   background: linear-gradient(90deg, #8a7040, #e8d49a);
   box-shadow: 0 0 6px rgb(232 212 154 / 55%);
   transition: width var(--transition-normal);
+}
+
+.vitals__settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  margin-right: -4px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .vitals__chip {

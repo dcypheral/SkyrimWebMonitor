@@ -10,6 +10,7 @@ export const FEATURES = {
   TEXTURE_PREVIEW_MAX_SIZE: 'texture_preview.maxSize',
   INVENTORY_MODELS: 'inventory.models',
   SCREENSHOTS: 'screenshots',
+  PLAYER_RECORDS: 'player.records',
 } as const;
 
 export type Feature = (typeof FEATURES)[keyof typeof FEATURES];

@@ -2,10 +2,10 @@ import { ref, computed, watch } from 'vue';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useModal } from '@/shared/lib/composables/useModal';
 import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
+import { itemBinding } from '@/stores/hotkeys/lib/bindings';
 import { DataRouter } from '@/stores/adapters/dataRouter';
 import { DropItemsModal, HotkeyPickerModal } from '@/shared/ui';
 import type { InventoryItem } from '@/stores/inventory/lib/types';
-import type { HotkeySlot } from '@/api/websocket';
 
 export function useInventoryItemActions(itemsList: () => InventoryItem[]) {
   const wsStore = useWebSocketStore();
@@ -40,14 +40,8 @@ export function useInventoryItemActions(itemsList: () => InventoryItem[]) {
           itemName,
         },
         on: {
-          select: (slot: HotkeySlot) => {
-            const existing = hotkeysStore.getSlotForFormId(formId);
-            if (existing === slot) {
-              // Toggle off: clear the binding
-              wsStore.sendCommand({ command: 'hotkey_clear', slot });
-            } else {
-              wsStore.sendCommand({ command: 'hotkey_set', formId, slot });
-            }
+          select: (slot: number) => {
+            hotkeysStore.toggle(slot, itemBinding(activeItemData.value ?? undefined, formId, itemName));
             closeModal();
           },
         },

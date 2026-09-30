@@ -5,3 +5,5 @@ export { default as TheIllusion } from './the-illusion/TheIllusion.vue';
 export { default as TheRestoration } from './the-restoration/TheRestoration.vue';
 export { default as TheEnchanting } from './the-enchanting/TheEnchanting.vue';
 export { default as TheShouts } from './the-shouts/TheShouts.vue';
+export { default as TheSpellbook } from './the-spellbook/TheSpellbook.vue';
+export { default as ThePowers } from './the-powers/ThePowers.vue';

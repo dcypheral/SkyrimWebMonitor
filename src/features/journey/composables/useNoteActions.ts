@@ -17,6 +17,7 @@ export function useNoteActions() {
   function openNewNote(): void {
     openModal({
       component: NoteEditor,
+      placement: 'top',
       props: { note: null },
       ghostClickGuardMs: 300,
       on: { close: closeModal, saved: closeModal },
@@ -28,6 +29,7 @@ export function useNoteActions() {
     if (!note) return;
     openModal({
       component: NoteEditor,
+      placement: 'top',
       props: { note },
       on: { close: closeModal, saved: closeModal },
     });

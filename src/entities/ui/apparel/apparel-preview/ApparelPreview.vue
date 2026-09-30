@@ -12,6 +12,8 @@
         :keywords="data.keywords"
         :enchanted="!!data.enchantment"
         :size="160"
+        expandable
+        :name="data.name"
         framing="upright"
       />
     </template>

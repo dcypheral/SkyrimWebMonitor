@@ -2,27 +2,31 @@
   <button
     type="button"
     class="shout"
-    :class="{ 'shout--empty': !shout, 'shout--compact': compact }"
-    :aria-label="shout ? `${t('pages.home.shout')}: ${shout.name}` : t('pages.home.noShout')"
+    :class="{ 'shout--empty': !shout && !power, 'shout--compact': compact, 'shout--power': !!power }"
+    :aria-label="ariaLabel"
     @click="emit('pick')"
   >
     <base-icon
       v-if="!compact"
-      icon-path="lorc/shouting.svg"
+      :icon-path="power ? 'lorc/embrassed-energy.svg' : 'lorc/shouting.svg'"
       :size="18"
-      :background-color="shout ? 'var(--skyrim-text-accent)' : 'var(--skyrim-text-dim)'"
+      :background-color="shout || power ? 'var(--skyrim-text-accent)' : 'var(--skyrim-text-dim)'"
     />
     <span class="shout__text">
-      <span class="shout__name">{{ shout?.name ?? t('pages.home.noShout') }}</span>
+      <span class="shout__name">{{ power?.name ?? shout?.name ?? t('pages.home.noShout') }}</span>
       <span
-        v-if="shout && shout.words.length"
+        v-if="power"
+        class="shout__kind"
+      >{{ power.spellType === 'Power' ? t('pages.spellbook.greater') : t('pages.spellbook.lesser') }}</span>
+      <span
+        v-else-if="shout && shout.words.length"
         class="shout__words"
-      :aria-label="t('pages.home.wordsKnown', { known: knownWords, total: shout.words.length })"
-    >
-      <span
-        v-for="(word, i) in shout.words"
-        :key="word.formId || i"
-        class="shout__word"
+        :aria-label="t('pages.home.wordsKnown', { known: knownWords, total: shout.words.length })"
+      >
+        <span
+          v-for="(word, i) in shout.words"
+          :key="word.formId || i"
+          class="shout__word"
           :class="{ 'shout__word--known': word.isKnown }"
         />
       </span>
@@ -34,18 +38,25 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BaseIcon } from '@/shared/ui';
-import type { ShoutItem } from '@/stores/magic/lib/types';
+import type { PowerItem, ShoutItem } from '@/stores/magic/lib/types';
 
 const props = withDefaults(
   defineProps<{
     shout: ShoutItem | null;
+    /** Power in the voice slot (shown instead of the shout). */
+    power?: PowerItem | null;
     /** Two-line layout (name over word marks) for narrow rows. */
     compact?: boolean;
   }>(),
-  { compact: false },
+  { compact: false, power: null },
 );
 const emit = defineEmits<{ pick: [] }>();
 const { t } = useI18n();
+
+const ariaLabel = computed(() => {
+  if (props.power) return `${t('pages.home.voice.powers')}: ${props.power.name}`;
+  return props.shout ? `${t('pages.home.shout')}: ${props.shout.name}` : t('pages.home.noShout');
+});
 
 const knownWords = computed(() => props.shout?.words.filter((w) => w.isKnown).length ?? 0);
 </script>
@@ -113,6 +124,14 @@ const knownWords = computed(() => props.shout?.words.filter((w) => w.isKnown).le
   .shout--empty & {
     color: var(--skyrim-text-dim);
   }
+}
+
+.shout__kind {
+  font-family: var(--font-heading);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8fc7ff;
 }
 
 .shout__words {

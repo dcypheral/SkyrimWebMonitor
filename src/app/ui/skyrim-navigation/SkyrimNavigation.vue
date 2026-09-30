@@ -108,6 +108,8 @@ const SUBTAB_ICONS: Record<string, string> = {
   restoration: MAGIC_SCHOOL_ICON_PATHS.Restoration,
   enchanting: 'lorc/crystal-wand.svg',
   shouts: MAGIC_SCHOOL_ICON_PATHS.Shouts,
+  spellbook: 'lorc/book-aura.svg',
+  powers: 'lorc/embrassed-energy.svg',
 };
 
 /** Icon map for the current sub-tabs when every one has an icon, else null. */
@@ -145,6 +147,8 @@ function centerActive(container: HTMLElement | null, activeSelector: string) {
 
 function getSubtabLabel(sub: SubTab) {
   if (nav.activeTab === 'magic') {
+    // Spellbook and powers are app pages; schools/shouts keep game names.
+    if (sub.id === 'spellbook' || sub.id === 'powers') return t(`app.tabs.magic.subtabs.${sub.id}`);
     return sub.label;
   }
   return t(`app.tabs.${nav.activeTab}.subtabs.${sub.id}`);

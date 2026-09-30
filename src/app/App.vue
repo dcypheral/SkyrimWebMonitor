@@ -1,7 +1,9 @@
 <template>
   <div class="handheld-device">
     <template v-if="isConnected">
+      <!-- Home uses the whole screen; its vitals row replaces the top bar. -->
       <skyrim-navigation
+        v-if="activeTab !== 'home'"
         :active-tab="activeTab"
         :active-sub-tab="activeSubTab"
       />
@@ -18,6 +20,7 @@
 
     <connection-status v-else />
     <skyrim-modal />
+    <model-viewer-overlay />
     <game-status-backdrop />
     <combat-indicator />
     <exit-toast :visible="showToast" />
@@ -37,6 +40,7 @@ import {
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useAppLoader } from '@/app/lib/composables/useAppLoader';
+import { ModelViewerOverlay } from '@/entities/ui/icons';
 import { useBackGuard } from '@/shared/lib/composables/useBackGuard';
 import { installCompanionMode } from '@/shared/lib/native/companionMode';
 

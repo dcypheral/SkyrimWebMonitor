@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import type { MagicSchoolState, MagicCategory, ShoutsState } from './lib/types';
+import type { MagicSchoolState, MagicCategory, PowerItem, PowersState, ShoutsState, SpellItem } from './lib/types';
 
 export const useMagicStore = defineStore('magic', () => {
   // State for magic categories
@@ -42,6 +42,20 @@ export const useMagicStore = defineStore('magic', () => {
   const illusionList = computed(() => (illusion.value.items || []).sort((a, b) => a.name.localeCompare(b.name)));
   const restorationList = computed(() => (restoration.value.items || []).sort((a, b) => a.name.localeCompare(b.name)));
   const enchantingList = computed(() => (enchanting.value.items || []).sort((a, b) => a.name.localeCompare(b.name)));
+  const powers = ref<PowersState>({ items: undefined });
+  const lesserPowers = ref<PowersState>({ items: undefined });
+  const powersList = computed<PowerItem[]>(() =>
+    [...(powers.value.items ?? []), ...(lesserPowers.value.items ?? [])].sort((a, b) => a.name.localeCompare(b.name)),
+  );
+  /** Every spell of every school, for the spellbook. */
+  const allSpells = computed<SpellItem[]>(() => [
+    ...(destruction.value.items ?? []),
+    ...(alteration.value.items ?? []),
+    ...(conjuration.value.items ?? []),
+    ...(illusion.value.items ?? []),
+    ...(restoration.value.items ?? []),
+    ...(enchanting.value.items ?? []),
+  ]);
   const shoutsList = computed(() => (shouts.value.items || []).sort((a, b) => a.name.localeCompare(b.name)));
 
   // Setters
@@ -77,6 +91,14 @@ export const useMagicStore = defineStore('magic', () => {
     shouts.value = newShouts;
   };
 
+  const setPowers = (data: PowersState) => {
+    powers.value = data;
+  };
+
+  const setLesserPowers = (data: PowersState) => {
+    lesserPowers.value = data;
+  };
+
   return {
     categories,
     destruction,
@@ -93,6 +115,10 @@ export const useMagicStore = defineStore('magic', () => {
     restorationList,
     enchantingList,
     shoutsList,
+    powersList,
+    allSpells,
+    setPowers,
+    setLesserPowers,
     setCategories,
     setDestruction,
     setAlteration,

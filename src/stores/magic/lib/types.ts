@@ -120,6 +120,22 @@ export interface ShoutsState {
   items?: ShoutItem[] | null;
 }
 
+// Greater / lesser power (voice slot)
+export interface PowerItem {
+  name: string;
+  formId: string;
+  spellType: 'Power' | 'LesserPower';
+  cost: number;
+  effects: SpellEffect[];
+  isEquipped: boolean;
+  isFavorite: boolean;
+  hotkeys: number[];
+}
+
+export interface PowersState {
+  items?: PowerItem[] | null;
+}
+
 // State for all magic categories and items
 export interface MagicState {
   categories?: MagicCategory[] | null;

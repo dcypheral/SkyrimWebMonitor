@@ -4,11 +4,11 @@
     :class="`slots-grid--gap-${gap}`"
   >
     <button
-      v-for="entry in slots"
+      v-for="entry in allSlots"
       :key="entry.slot"
       type="button"
       class="btn slot-btn"
-      :class="{ active: entry.slot === activeSlot }"
+      :class="{ active: entry.slot === activeSlot, 'slot-btn--app': entry.slot > 8 }"
       :disabled="disableInactive && !entry.bound"
       @click="emit('select', entry.slot)"
     >
@@ -33,11 +33,10 @@ import { storeToRefs } from 'pinia';
 import { BaseIcon } from '@/shared/ui';
 import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
 import { getHotkeyIconPath } from '@/shared/lib/utils/hotkeyIcons';
-import type { HotkeySlot } from '@/api/websocket';
 import type { HotkeySlotEntry } from '@/stores/hotkeys/lib/types';
 
 interface Props {
-  activeSlot?: HotkeySlot | null;
+  activeSlot?: number | null;
   gap?: 'sm' | 'md';
   disableInactive?: boolean;
 }
@@ -49,11 +48,11 @@ withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  select: [slot: HotkeySlot];
+  select: [slot: number];
 }>();
 
 const hotkeysStore = useHotkeysStore();
-const { slots } = storeToRefs(hotkeysStore);
+const { allSlots } = storeToRefs(hotkeysStore);
 
 function iconFor(entry: HotkeySlotEntry): string {
   return getHotkeyIconPath(entry) ?? 'lorc/cog.svg';
@@ -64,7 +63,7 @@ function iconFor(entry: HotkeySlotEntry): string {
 .slots-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-auto-rows: auto;
   width: 100%;
 }
 
@@ -82,6 +81,11 @@ function iconFor(entry: HotkeySlotEntry): string {
   gap: var(--spacing-xs);
   aspect-ratio: 1 / 1;
   padding: var(--spacing-md);
+
+  /* 9–16 are the app's own hotkeys: same use, slightly different frame. */
+  &--app {
+    border-style: dashed;
+  }
 }
 
 .slot-number {

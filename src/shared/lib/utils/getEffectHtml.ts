@@ -79,3 +79,19 @@ export function getEffectHtml(
   if (!effects || !effects.length) return '';
   return effects.map((effect) => formatEffectHtml(effect, isSurvivalMode)).join(' ');
 }
+
+/** Plain-text version (tags removed, entities decoded) for text-only UIs. */
+export function getEffectText(
+  effects: ItemEnchantmentEffect[] | null | undefined,
+  isSurvivalMode: boolean = false,
+): string {
+  return getEffectHtml(effects, isSurvivalMode)
+    .replace(/<[^>]*>/g, '')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

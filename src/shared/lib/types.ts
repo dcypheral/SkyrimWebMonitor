@@ -57,6 +57,11 @@ export type ListItem = InventoryItem | SpellItem | ShoutItem | QuestListEntry;
 
 export interface ModalOptions {
   component: Component;
+  /**
+   * `top` pins the panel to the top of the screen (forms with a keyboard:
+   * the on-screen keyboard covers the lower half).
+   */
+  placement?: 'center' | 'top';
   /** props of child component */
   props?: Record<string, unknown>;
   /** event handlers of child component */

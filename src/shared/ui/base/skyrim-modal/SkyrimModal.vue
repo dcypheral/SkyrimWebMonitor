@@ -7,6 +7,7 @@
       <div
         v-if="isOpen"
         class="skyrim-backdrop skyrim-backdrop--fixed skyrim-backdrop--overlay skyrim-backdrop--blocking"
+        :class="{ 'skyrim-modal--top': placement === 'top' }"
         role="dialog"
         aria-modal="true"
         @click.capture="onModalRootClickCapture"
@@ -42,6 +43,7 @@ const {
   modalHandlers,
   openedAtMs,
   ghostClickGuardMs,
+  placement,
   closeModal,
 } = useModal();
 

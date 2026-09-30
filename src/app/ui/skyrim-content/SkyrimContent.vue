@@ -1,10 +1,5 @@
 <template>
-  <div
-    class="skyrim-panel animate-slide-down"
-    @touchstart.passive="onTouchStart"
-    @touchend.passive="onTouchEnd"
-    @touchcancel.passive="onTouchCancel"
-  >
+  <div class="skyrim-panel animate-slide-down">
     <Transition
       :name="transitionName"
       mode="out-in"
@@ -30,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { usePageRouter } from '@/app/router/usePageRouter';
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
 
@@ -43,30 +38,6 @@ const transitionName = computed(() => {
     ? `slide-${nav.transitionDirection}`
     : 'no-slide';
 });
-
-const touchStartX = ref<number | null>(null);
-const THRESHOLD = 50;
-
-const onTouchStart = (e: TouchEvent) => {
-  touchStartX.value = e.touches?.[0]?.clientX ?? null;
-};
-
-const onTouchEnd = (e: TouchEvent) => {
-  if (touchStartX.value === null) return;
-  const endX = e.changedTouches?.[0]?.clientX ?? 0;
-  const delta = endX - touchStartX.value;
-  touchStartX.value = null;
-  if (Math.abs(delta) < THRESHOLD) return;
-  if (delta < 0) {
-    nav.nextSubTab();
-  } else {
-    nav.prevSubTab();
-  }
-};
-
-const onTouchCancel = () => {
-  touchStartX.value = null;
-};
 
 const currentComponent = computed(() => {
   return usePageRouter(props.tab, props.subTab);

@@ -2,8 +2,16 @@
   <div
     ref="root"
     class="item-thumbnail"
-    :class="{ 'item-thumbnail--enchanted': enchanted, 'item-thumbnail--rendered': !!url }"
+    :class="{
+      'item-thumbnail--enchanted': enchanted,
+      'item-thumbnail--rendered': !!url,
+      'item-thumbnail--expandable': canExpand,
+    }"
     :style="{ '--thumb-size': `${size}px`, '--thumb-glow': ENCHANTED_GLOW_COLOR }"
+    :role="canExpand ? 'button' : undefined"
+    :tabindex="canExpand ? 0 : undefined"
+    :aria-label="canExpand ? t('shared.ui.viewer.open', { name }) : undefined"
+    @click="expand"
   >
     <img
       v-if="url"
@@ -20,6 +28,11 @@
       :size="iconSize"
       :background-color="material.color"
     />
+    <span
+      v-if="canExpand"
+      class="item-thumbnail__badge"
+      aria-hidden="true"
+    >3D</span>
   </div>
 </template>
 
@@ -29,6 +42,8 @@ import { BaseIcon } from '@/shared/ui';
 import { ENCHANTED_GLOW_COLOR, getItemMaterial } from '@/shared/lib/constants/itemMaterials';
 import type { ThumbnailFraming } from '@/shared/lib/nif';
 import { useItemThumbnailsStore } from '@/stores/item-thumbnails/useItemThumbnailsStore';
+import { useI18n } from 'vue-i18n';
+import { useModelViewer } from '../model-viewer/useModelViewer';
 
 interface Props {
   /** Category icon shown until (or instead of) the 3D render. */
@@ -39,6 +54,10 @@ interface Props {
   /** Box size in px; the 3D render fills it, the fallback icon uses ~75%. */
   size?: number;
   framing?: ThumbnailFraming;
+  /** Tap opens the fullscreen 3D viewer (large previews). */
+  expandable?: boolean;
+  /** Item name for the viewer title. */
+  name?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -47,7 +66,12 @@ const props = withDefaults(defineProps<Props>(), {
   enchanted: false,
   size: 32,
   framing: 'diagonal',
+  expandable: false,
+  name: '',
 });
+
+const { t } = useI18n();
+const modelViewer = useModelViewer();
 
 const store = useItemThumbnailsStore();
 const root = ref<HTMLElement | null>(null);
@@ -62,6 +86,14 @@ const source = computed(() => ({
   framing: props.framing,
 }));
 const url = computed(() => store.urlFor(source.value));
+
+/** Only offered once a render worked, so the viewer will too. */
+const canExpand = computed(() => props.expandable && !!props.modelPath && !!url.value);
+
+function expand(): void {
+  if (!canExpand.value || !props.modelPath) return;
+  modelViewer.open({ modelPath: props.modelPath, name: props.name, keywords: props.keywords, framing: props.framing });
+}
 
 function requestIfVisible(): void {
   if (isVisible.value && props.modelPath) store.request(source.value);
@@ -109,6 +141,26 @@ watch(source, requestIfVisible);
     height: 100%;
     object-fit: contain;
     animation: item-thumbnail-in var(--transition-fast, 150ms) ease-out;
+  }
+
+  &--expandable {
+    position: relative;
+    cursor: zoom-in;
+  }
+
+  &__badge {
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    padding: 0 5px;
+    background: rgb(0 0 0 / 65%);
+    border: 1px solid var(--skyrim-border-medium);
+    border-radius: 999px;
+    font-family: var(--font-heading);
+    font-size: 0.56rem;
+    letter-spacing: 0.08em;
+    color: var(--skyrim-text-secondary);
+    pointer-events: none;
   }
 
   &--enchanted {

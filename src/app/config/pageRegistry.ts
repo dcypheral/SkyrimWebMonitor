@@ -28,6 +28,8 @@ import {
   TheQuests,
   TheMap,
   TheJournal,
+  TheSpellbook,
+  ThePowers,
 } from '@/pages';
 
 const INVENTORY_FREQUENCY = 200; // ms
@@ -78,6 +80,8 @@ export const pagesRegistry: PagesRegistry = {
           fields: { items: 'Magic::Items::Shouts' },
           settings: { frequency: 1000 },
         },
+        { id: 'magic.powers', fields: { items: 'Magic::Items::Powers' }, settings: { frequency: 2000 } },
+        { id: 'magic.lesserPowers', fields: { items: 'Magic::Items::LesserPowers' }, settings: { frequency: 2000 } },
         {
           id: 'quests.questsList',
           fields: { quests: 'Player::Quests' },
@@ -101,21 +105,12 @@ export const pagesRegistry: PagesRegistry = {
       component: TheStats,
       subscriptions: [
         {
-          id: 'character.stats',
+          id: 'character.records',
           fields: {
-            health: 'ActorValue::kHealth',
-            magicka: 'ActorValue::kMagicka',
-            stamina: 'ActorValue::kStamina',
-            healthBase: 'ActorValue::kHealth::Base',
-            magickaBase: 'ActorValue::kMagicka::Base',
-            staminaBase: 'ActorValue::kStamina::Base',
-            level: 'Player::Level',
-            xp: 'Player::XP::Current',
-            xpNext: 'Player::XP::Next',
-            inventoryWeight: 'Player::InventoryWeight',
-            carryWeight: 'Player::CarryWeight',
-            gold: 'Inventory::Gold',
+            miscStats: 'Player::MiscStats',
+            effects: 'Player::ActiveEffects',
           },
+          settings: { frequency: 2000 },
         },
       ],
     },
@@ -267,6 +262,49 @@ export const pagesRegistry: PagesRegistry = {
   },
 
   magic: {
+    spellbook: {
+      component: TheSpellbook,
+      // Every school at once; slower than a single-school page on purpose.
+      subscriptions: [
+        {
+          id: 'magic.destruction',
+          fields: { items: 'Magic::Items::Destruction' },
+          settings: { frequency: 1000 },
+        },
+        {
+          id: 'magic.alteration',
+          fields: { items: 'Magic::Items::Alteration' },
+          settings: { frequency: 1000 },
+        },
+        {
+          id: 'magic.conjuration',
+          fields: { items: 'Magic::Items::Conjuration' },
+          settings: { frequency: 1000 },
+        },
+        {
+          id: 'magic.illusion',
+          fields: { items: 'Magic::Items::Illusion' },
+          settings: { frequency: 1000 },
+        },
+        {
+          id: 'magic.restoration',
+          fields: { items: 'Magic::Items::Restoration' },
+          settings: { frequency: 1000 },
+        },
+        {
+          id: 'magic.enchanting',
+          fields: { items: 'Magic::Items::Enchanting' },
+          settings: { frequency: 1000 },
+        },
+      ],
+    },
+    powers: {
+      component: ThePowers,
+      subscriptions: [
+        { id: 'magic.powers', fields: { items: 'Magic::Items::Powers' }, settings: { frequency: 1000 } },
+        { id: 'magic.lesserPowers', fields: { items: 'Magic::Items::LesserPowers' }, settings: { frequency: 1000 } },
+      ],
+    },
     destruction: {
       component: TheDestruction,
       subscriptions: [
@@ -368,6 +406,11 @@ export const pagesRegistry: PagesRegistry = {
   },
 
   quests: {
+    journal: {
+      // Journey data comes from the always-on journey subscriptions.
+      component: TheJournal,
+      subscriptions: [],
+    },
     questsList: {
       component: TheQuests,
       subscriptions: [
@@ -385,11 +428,6 @@ export const pagesRegistry: PagesRegistry = {
   },
 
   map: {
-    journal: {
-      // Journey data comes from the always-on journey subscriptions.
-      component: TheJournal,
-      subscriptions: [],
-    },
     view: {
       component: TheMap,
       subscriptions: [

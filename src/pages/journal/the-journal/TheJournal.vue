@@ -186,7 +186,7 @@ async function share(): Promise<void> {
 function showSessionOnMap(id: number): void {
   journeyLayers.path = true;
   journeyLayers.focusSessionId = id;
-  nav.setActiveSubTab('view');
+  nav.setActiveTab('map');
 }
 
 async function deleteSession(id: number): Promise<void> {

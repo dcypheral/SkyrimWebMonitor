@@ -113,6 +113,17 @@ export function isThumbnailRenderingSupported(): boolean {
   }
 }
 
+/**
+ * The framing rotation a thumbnail uses (BSInvMarker, else a heuristic).
+ * The interactive viewer starts from the same pose.
+ */
+export function modelOrientation(model: NifModel, framing: ThumbnailFraming = 'diagonal'): number[] {
+  const meshes = model.meshes.filter((m) => m.indices.length > 0);
+  return model.invMarker
+    ? invMarkerRotation(model.invMarker.rotationX, model.invMarker.rotationY, model.invMarker.rotationZ)
+    : heuristicRotation(meshes, framing);
+}
+
 /** Returns a data: URL, or null when the model has no drawable geometry. */
 export function renderNifThumbnail(model: NifModel, options: ThumbnailOptions = {}): string | null {
   const meshes = model.meshes.filter((m) => m.indices.length > 0);
@@ -280,7 +291,7 @@ function transformMesh(mesh: NifMesh, m: Mat3): TransformedGeometry {
   return { positions, normals };
 }
 
-function computeNormals(positions: Float32Array, indices: Uint32Array): Float32Array {
+export function computeNormals(positions: Float32Array, indices: Uint32Array): Float32Array {
   const normals = new Float32Array(positions.length);
   for (let i = 0; i < indices.length; i += 3) {
     const a = indices[i] * 3;
@@ -330,7 +341,7 @@ function viewBounds(all: Float32Array[]): { min: number[]; max: number[] } | nul
 
 // ─── Orientation ─────────────────────────────────────────────────────────
 
-function rotX(a: number): Mat3 {
+export function rotX(a: number): Mat3 {
   const c = Math.cos(a);
   const s = Math.sin(a);
   return [1, 0, 0, 0, c, -s, 0, s, c];
@@ -342,13 +353,13 @@ function rotY(a: number): Mat3 {
   return [c, 0, s, 0, 1, 0, -s, 0, c];
 }
 
-function rotZ(a: number): Mat3 {
+export function rotZ(a: number): Mat3 {
   const c = Math.cos(a);
   const s = Math.sin(a);
   return [c, -s, 0, s, c, 0, 0, 0, 1];
 }
 
-function mul(a: Mat3, b: Mat3): Mat3 {
+export function mul(a: Mat3, b: Mat3): Mat3 {
   const out = new Array<number>(9);
   for (let r = 0; r < 3; r++) {
     for (let c = 0; c < 3; c++) {

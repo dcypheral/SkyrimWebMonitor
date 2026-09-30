@@ -8,8 +8,9 @@ import { useMapHotspotsStore } from '@/stores/map/useMapHotspotsStore';
 import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
 import { useQuestStore } from '@/stores/quests/useQuestStore';
 import { useJourneyStore } from '@/stores/journey/useJourneyStore';
+import { useRecordsStore } from '@/stores/character/useRecordsStore';
 import type { RouterResult } from './lib/types';
-import { isCharacterStatsData, isWeaponsData, isApparelData, isFoodData, isPotionsData, isScrollsData, isKeysData, isBooksData, isInventoryCategories, isIngredientsData, isMiscData, isMagicCategoriesData, isDestructionData, isAlterationData, isConjurationData, isIllusionData, isRestorationData, isEnchantingData, isShoutsData, isHotkeyItemsData, isQuestsData, isGameStatusData, isMapHotspotsData, isMapQuestMarkersData, isPlayerPositionData } from './typeGuards';
+import { isCharacterStatsData, isWeaponsData, isApparelData, isFoodData, isPotionsData, isScrollsData, isKeysData, isBooksData, isInventoryCategories, isIngredientsData, isMiscData, isMagicCategoriesData, isDestructionData, isAlterationData, isConjurationData, isIllusionData, isRestorationData, isEnchantingData, isShoutsData, isHotkeyItemsData, isQuestsData, isGameStatusData, isMapHotspotsData, isMapQuestMarkersData, isPlayerPositionData, isPowerItem } from './typeGuards';
 import { logger } from '@/shared/lib/utils/logger';
 
 export class DataRouter {
@@ -17,6 +18,11 @@ export class DataRouter {
     const characterStore = useCharacterStore();
     const inventoryStore = useInventoryStore();
     try {
+      if (subscriptionId === 'character.records') {
+        useRecordsStore().setRecords(data);
+        return { success: true, message: 'Data routed to records store' };
+      }
+
       if (subscriptionId.startsWith('journey.')) {
         useJourneyStore().ingest(subscriptionId, data);
         // Keep the player position fresh on every page (notes pin to it).
@@ -120,10 +126,20 @@ export class DataRouter {
         const navigationStore = useNavigationStore();
         const magicStore = useMagicStore();
         magicStore.setCategories(data.categories ?? undefined);
-        const subTabs = (data.categories || []).map((cat) => ({
+        // One spellbook page holds every school; shouts and powers keep
+        // their own pages (lesser powers are shown with the powers).
+        const SCHOOLS = ['destruction', 'alteration', 'conjuration', 'illusion', 'restoration', 'enchanting'];
+        const serverTabs = (data.categories || []).map((cat) => ({
           id: cat.categoryId.toLowerCase(),
           label: cat.name,
         }));
+        const hasSpells = serverTabs.some((s) => SCHOOLS.includes(s.id));
+        const hasPowers = serverTabs.some((s) => s.id === 'powers' || s.id === 'lesserpowers');
+        const subTabs = [
+          ...(hasSpells ? [{ id: 'spellbook', label: 'Spellbook' }] : []),
+          ...serverTabs.filter((s) => !SCHOOLS.includes(s.id) && s.id !== 'powers' && s.id !== 'lesserpowers'),
+          ...(hasPowers ? [{ id: 'powers', label: 'Powers' }] : []),
+        ];
 
         const orderMap = navigationStore.subTabsOrderMap;
         const order = orderMap?.magic ?? [];
@@ -180,6 +196,15 @@ export class DataRouter {
         logger.log('[DataRouter] Routing enchanting spells to magic store');
         useMagicStore().setEnchanting(data);
         return { success: true, message: 'Data routed to magic store (enchanting)' };
+      }
+
+      if (subscriptionId === 'magic.powers' || subscriptionId === 'magic.lesserPowers') {
+        if (typeof data === 'object' && data !== null && 'items' in data && Array.isArray(data.items)) {
+          const items = data.items.filter(isPowerItem);
+          if (subscriptionId === 'magic.powers') useMagicStore().setPowers({ items });
+          else useMagicStore().setLesserPowers({ items });
+          return { success: true, message: 'Data routed to magic store (powers)' };
+        }
       }
 
       if (isShoutsData(data, subscriptionId)) {

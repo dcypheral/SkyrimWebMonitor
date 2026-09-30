@@ -10,6 +10,8 @@
         :model-path="data.modelPath"
         :keywords="data.keywords"
         :size="160"
+        expandable
+        :name="data.name"
         framing="diagonal"
       />
     </template>

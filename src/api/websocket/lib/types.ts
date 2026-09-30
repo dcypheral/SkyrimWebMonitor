@@ -15,6 +15,7 @@ export type CommandType =
   | 'favorite_spell'
   | 'equip_shout'
   | 'unequip_shout'
+  | 'equip_power'
   | 'favorite_shout'
   | 'hotkey_set'
   | 'hotkey_clear'

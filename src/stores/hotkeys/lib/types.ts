@@ -4,15 +4,23 @@ import type { MagicSchool } from '@/stores/magic/lib/types';
 
 export type HotkeyKind = 'spell' | 'item';
 
+/** Slots 1–8 are the game's own hotkeys; 9–16 live in the app. */
+export const NATIVE_HOTKEY_COUNT = 8;
+export const TOTAL_HOTKEY_COUNT = 16;
+
+export function isNativeHotkeySlot(slot: number): slot is HotkeySlot {
+  return Number.isInteger(slot) && slot >= 1 && slot <= NATIVE_HOTKEY_COUNT;
+}
+
 export type SpellKind = 'Spell' | 'Power' | 'LesserPower' | 'VoicePower' | 'Shout';
 
 export interface HotkeySlotUnbound {
-  slot: HotkeySlot;
+  slot: number;
   bound: false;
 }
 
 export interface HotkeySlotSpell {
-  slot: HotkeySlot;
+  slot: number;
   bound: true;
   kind: 'spell';
   name: string;
@@ -25,7 +33,7 @@ export interface HotkeySlotSpell {
 }
 
 export interface HotkeySlotItem {
-  slot: HotkeySlot;
+  slot: number;
   bound: true;
   kind: 'item';
   name: string;
@@ -42,6 +50,9 @@ export interface HotkeySlotItem {
 }
 
 export type HotkeySlotEntry = HotkeySlotUnbound | HotkeySlotSpell | HotkeySlotItem;
+
+/** What a binding needs to remember (slot and bound flag are added on bind). */
+export type HotkeyBinding = Omit<HotkeySlotSpell, 'slot' | 'bound'> | Omit<HotkeySlotItem, 'slot' | 'bound'>;
 
 export interface HotkeyItemsState {
   items?: HotkeySlotEntry[] | null;

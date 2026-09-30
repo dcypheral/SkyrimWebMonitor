@@ -1,49 +1,112 @@
 <template>
   <div class="modal-content shout-picker">
-    <h3 class="modal-title text-base m-0">{{ t('pages.home.shoutPickerTitle') }}</h3>
-    <p
-      v-if="shouts.length === 0"
-      class="text-sm text-secondary m-0"
+    <div
+      class="shout-picker__tabs"
+      role="tablist"
     >
-      {{ t('pages.home.noShouts') }}
-    </p>
-    <ul
-      v-else
-      class="shout-picker__list"
-    >
-      <li
-        v-for="shout in shouts"
-        :key="shout.formId"
+      <button
+        type="button"
+        role="tab"
+        class="shout-picker__tab"
+        :class="{ 'shout-picker__tab--active': tab === 'shouts' }"
+        :aria-selected="tab === 'shouts'"
+        @click="tab = 'shouts'"
       >
-        <button
-          type="button"
-          class="shout-picker__row"
-          :class="{ 'shout-picker__row--equipped': shout.isEquipped }"
-          :aria-pressed="shout.isEquipped"
-          @click="emit('select', shout.formId)"
+        {{ t('pages.home.voice.shouts') }}
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="shout-picker__tab"
+        :class="{ 'shout-picker__tab--active': tab === 'powers' }"
+        :aria-selected="tab === 'powers'"
+        @click="tab = 'powers'"
+      >
+        {{ t('pages.home.voice.powers') }}
+      </button>
+    </div>
+
+    <template v-if="tab === 'shouts'">
+      <p
+        v-if="shouts.length === 0"
+        class="text-sm text-secondary m-0"
+      >
+        {{ t('pages.home.noShouts') }}
+      </p>
+      <ul
+        v-else
+        class="shout-picker__list"
+      >
+        <li
+          v-for="shout in shouts"
+          :key="shout.formId"
         >
-          <span class="shout-picker__name">{{ shout.name }}</span>
-          <span class="shout-picker__words">
-            <span
-              v-for="(word, i) in shout.words"
-              :key="word.formId || i"
-              class="shout-picker__word"
-              :class="{ 'shout-picker__word--known': word.isKnown }"
-            >{{ word.isKnown ? word.name : '' }}</span>
-          </span>
-        </button>
-      </li>
-    </ul>
+          <button
+            type="button"
+            class="shout-picker__row"
+            :class="{ 'shout-picker__row--equipped': shout.isEquipped }"
+            :aria-pressed="shout.isEquipped"
+            @click="emit('select', shout.formId)"
+          >
+            <span class="shout-picker__name">{{ shout.name }}</span>
+            <span class="shout-picker__words">
+              <span
+                v-for="(word, i) in shout.words"
+                :key="word.formId || i"
+                class="shout-picker__word"
+                :class="{ 'shout-picker__word--known': word.isKnown }"
+              >{{ word.isKnown ? word.name : '' }}</span>
+            </span>
+          </button>
+        </li>
+      </ul>
+    </template>
+
+    <template v-else>
+      <p
+        v-if="powers.length === 0"
+        class="text-sm text-secondary m-0"
+      >
+        {{ t('pages.spellbook.noPowers') }}
+      </p>
+      <ul
+        v-else
+        class="shout-picker__list"
+      >
+        <li
+          v-for="power in powers"
+          :key="power.formId"
+        >
+          <button
+            type="button"
+            class="shout-picker__row"
+            :class="{ 'shout-picker__row--equipped': power.isEquipped }"
+            :aria-pressed="power.isEquipped"
+            @click="emit('selectPower', power.formId)"
+          >
+            <span class="shout-picker__name">{{ power.name }}</span>
+            <span class="shout-picker__kind">
+              {{ power.spellType === 'Power' ? t('pages.spellbook.greater') : t('pages.spellbook.lesser') }}
+            </span>
+          </button>
+        </li>
+      </ul>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import type { ShoutItem } from '@/stores/magic/lib/types';
+import type { PowerItem, ShoutItem } from '@/stores/magic/lib/types';
 
-defineProps<{ shouts: ShoutItem[] }>();
-const emit = defineEmits<{ select: [formId: string] }>();
+const props = withDefaults(
+  defineProps<{ shouts: ShoutItem[]; powers?: PowerItem[]; initialTab?: 'shouts' | 'powers' }>(),
+  { powers: () => [], initialTab: 'shouts' },
+);
+const emit = defineEmits<{ select: [formId: string]; selectPower: [formId: string] }>();
 const { t } = useI18n();
+const tab = ref<'shouts' | 'powers'>(props.initialTab);
 </script>
 
 <style scoped lang="scss">
@@ -52,6 +115,35 @@ const { t } = useI18n();
   flex-direction: column;
   gap: var(--spacing-md);
   min-width: min(340px, 86vw);
+}
+
+.shout-picker__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--skyrim-border-dark);
+}
+
+.shout-picker__tab {
+  flex: 1;
+  padding: 6px 0 8px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--skyrim-text-secondary);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+
+  &--active {
+    border-bottom-color: var(--skyrim-accent-main);
+    color: var(--skyrim-text-primary);
+  }
+}
+
+.shout-picker__kind {
+  font-size: 0.66rem;
+  color: var(--skyrim-text-dim);
 }
 
 .shout-picker__list {

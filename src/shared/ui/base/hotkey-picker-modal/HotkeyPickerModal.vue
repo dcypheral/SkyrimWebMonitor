@@ -23,10 +23,9 @@
 
 <script setup lang="ts">
 import HotkeySlotsGrid from '../hotkey-slots-grid/HotkeySlotsGrid.vue';
-import type { HotkeySlot } from '@/api/websocket';
 
 interface Props {
-  currentSlot?: HotkeySlot | null;
+  currentSlot?: number | null;
   itemName?: string | null;
 }
 
@@ -36,11 +35,11 @@ withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  select: [slot: HotkeySlot];
+  select: [slot: number];
   close: [];
 }>();
 
-function handleSlotClick(slot: HotkeySlot) {
+function handleSlotClick(slot: number) {
   emit('select', slot);
 }
 </script>
@@ -56,7 +55,13 @@ function handleSlotClick(slot: HotkeySlot) {
   min-width: 320px;
 }
 
+.hotkey-picker-grid {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 .hotkey-picker-grid :deep(.slot-btn) {
-  min-width: 90px;
+  min-width: 0;
+  padding: var(--spacing-sm);
 }
 </style>

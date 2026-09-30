@@ -23,7 +23,7 @@ import type {
 } from '@/stores/inventory/lib/types';
 import { CATEGORY_TYPES } from '@/stores/inventory/lib/types';
 import type { CategoriesData } from '@/shared/lib/types';
-import type { MagicState, MagicSchoolState, SpellItem, ShoutsState, ShoutItem } from '@/stores/magic/lib/types';
+import type { MagicState, MagicSchoolState, SpellItem, ShoutsState, ShoutItem, PowerItem } from '@/stores/magic/lib/types';
 import type { QuestsState, QuestJournalEntry, QuestListSection } from '@/stores/quests/lib/types';
 import type { HotkeyItemsState } from '@/stores/hotkeys/lib/types';
 import type { GameStatusData } from '@/stores/game/lib/types';
@@ -327,5 +327,14 @@ export function isPlayerPositionData(
     typeof pos.x === 'number' &&
     typeof pos.y === 'number' &&
     typeof pos.angle === 'number'
+  );
+}
+
+export function isPowerItem(item: unknown): item is PowerItem {
+  if (!isRecord(item)) return false;
+  return (
+    typeof item.formId === 'string' &&
+    typeof item.name === 'string' &&
+    (item.spellType === 'Power' || item.spellType === 'LesserPower')
   );
 }

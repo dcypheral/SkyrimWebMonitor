@@ -2,14 +2,26 @@
   <div class="home">
     <home-vitals class="home__vitals" />
 
-    <div class="home__slots home__slots--left">
-      <hotkey-slot-button
-        v-for="entry in leftSlots"
-        :key="entry.slot"
-        :entry="entry"
-        @trigger="triggerSlot(entry)"
-        @details="openSlotDetails(entry)"
-      />
+    <!-- Hotkeys: 1–4 | 5–8 on the first page, 9–12 | 13–16 below.
+         Both columns scroll together, one page at a time. -->
+    <div
+      ref="leftColumn"
+      class="home__slots home__slots--left"
+      @scroll.passive="syncColumns('left')"
+    >
+      <div
+        v-for="(page, p) in leftPages"
+        :key="p"
+        class="home__slots-page"
+      >
+        <hotkey-slot-button
+          v-for="entry in page"
+          :key="entry.slot"
+          :entry="entry"
+          @trigger="triggerSlot(entry)"
+          @details="openSlotDetails(entry)"
+        />
+      </div>
     </div>
 
     <div class="home__center">
@@ -56,6 +68,7 @@
           <shout-slot
             class="home__shout"
             :shout="equippedShout"
+            :power="equippedPower"
             :compact="archery.hasArchery.value"
             @pick="openShoutPicker"
           />
@@ -74,14 +87,24 @@
       </div>
     </div>
 
-    <div class="home__slots home__slots--right">
-      <hotkey-slot-button
-        v-for="entry in rightSlots"
-        :key="entry.slot"
-        :entry="entry"
-        @trigger="triggerSlot(entry)"
-        @details="openSlotDetails(entry)"
-      />
+    <div
+      ref="rightColumn"
+      class="home__slots home__slots--right"
+      @scroll.passive="syncColumns('right')"
+    >
+      <div
+        v-for="(page, p) in rightPages"
+        :key="p"
+        class="home__slots-page"
+      >
+        <hotkey-slot-button
+          v-for="entry in page"
+          :key="entry.slot"
+          :entry="entry"
+          @trigger="triggerSlot(entry)"
+          @details="openSlotDetails(entry)"
+        />
+      </div>
     </div>
 
     <quest-objective-card
@@ -123,13 +146,33 @@ const nav = useNavigationStore();
 const ws = useWebSocketStore();
 const { openModal, closeModal } = useModal();
 
-const { slots } = storeToRefs(useHotkeysStore());
-const leftSlots = computed(() => slots.value.slice(0, 4));
-const rightSlots = computed(() => slots.value.slice(4, 8));
+const hotkeys = useHotkeysStore();
+const { allSlots } = storeToRefs(hotkeys);
+const leftPages = computed(() => [allSlots.value.slice(0, 4), allSlots.value.slice(8, 12)]);
+const rightPages = computed(() => [allSlots.value.slice(4, 8), allSlots.value.slice(12, 16)]);
+
+const leftColumn = ref<HTMLElement | null>(null);
+const rightColumn = ref<HTMLElement | null>(null);
+let syncing: 'left' | 'right' | null = null;
+
+/** Keep both hotkey columns on the same page. */
+function syncColumns(from: 'left' | 'right'): void {
+  if (syncing && syncing !== from) return;
+  const src = from === 'left' ? leftColumn.value : rightColumn.value;
+  const dst = from === 'left' ? rightColumn.value : leftColumn.value;
+  if (!src || !dst || dst.scrollTop === src.scrollTop) return;
+  syncing = from;
+  dst.scrollTop = src.scrollTop;
+  requestAnimationFrame(() => {
+    syncing = null;
+  });
+}
 
 const magicStore = useMagicStore();
-const { shoutsList } = storeToRefs(magicStore);
+const { shoutsList, powersList } = storeToRefs(magicStore);
 const equippedShout = computed(() => shoutsList.value.find((s) => s.isEquipped) ?? null);
+/** A power in the voice slot replaces the shout (the game allows one). */
+const equippedPower = computed(() => powersList.value.find((p) => p.isEquipped) ?? null);
 
 const tracked = useTrackedQuest();
 const { t } = useI18n();
@@ -155,7 +198,7 @@ function pickAmmo(formId: string): void {
 }
 
 function triggerSlot(entry: HotkeySlotEntry): void {
-  ws.sendCommand({ command: 'hotkey_trigger', slot: entry.slot });
+  hotkeys.trigger(entry);
 }
 
 function openSlotDetails(entry: HotkeySlotEntry): void {
@@ -168,7 +211,7 @@ function openSlotDetails(entry: HotkeySlotEntry): void {
         closeModal();
       },
       clear: () => {
-        ws.sendCommand({ command: 'hotkey_clear', slot: entry.slot });
+        hotkeys.unbind(entry.slot);
         closeModal();
       },
     },
@@ -178,11 +221,20 @@ function openSlotDetails(entry: HotkeySlotEntry): void {
 function openShoutPicker(): void {
   openModal({
     component: ShoutPicker,
-    props: { shouts: shoutsList.value },
+    props: {
+      shouts: shoutsList.value,
+      powers: powersList.value,
+      initialTab: equippedPower.value ? 'powers' : 'shouts',
+    },
     on: {
       select: (formId: string) => {
         const shout = shoutsList.value.find((s) => s.formId === formId);
         if (shout && !shout.isEquipped) ws.sendCommand({ command: 'equip_shout', formId });
+        closeModal();
+      },
+      selectPower: (formId: string) => {
+        const power = powersList.value.find((p) => p.formId === formId);
+        if (power && !power.isEquipped) ws.sendCommand({ command: 'equip_power', formId });
         closeModal();
       },
     },
@@ -226,11 +278,19 @@ function openShoutPicker(): void {
 }
 
 .home__slots {
-  display: grid;
-  grid-template-rows: repeat(4, minmax(44px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-sm);
   min-width: 0;
   min-height: 0;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   &--left {
     grid-area: left;
@@ -239,6 +299,16 @@ function openShoutPicker(): void {
   &--right {
     grid-area: right;
   }
+}
+
+.home__slots-page {
+  display: grid;
+  grid-template-rows: repeat(4, minmax(44px, 1fr));
+  gap: var(--spacing-sm);
+  height: 100%;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
 }
 
 .home__center {

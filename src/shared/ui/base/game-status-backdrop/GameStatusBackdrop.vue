@@ -1,109 +1,131 @@
 <template>
   <Teleport to="body">
     <Transition
-      name="game-status-indicator"
+      name="game-status-pill"
       appear
     >
       <div
-        v-if="showIndicator"
-        class="game-status-indicator"
+        v-if="visible"
+        class="game-status-pill"
+        :class="{ 'game-status-pill--dead': dead }"
         role="status"
         aria-live="polite"
         :aria-label="$t('shared.ui.gameStatus.title')"
       >
-        <div
-          class="game-status-indicator__arc"
-          aria-hidden="true"
-        />
         <base-icon
-          class="game-status-indicator__icon"
-          :icon-path="indicatorIconPath"
-          :size="40"
+          :icon-path="iconPath"
+          :size="12"
+          :background-color="dead ? '#e08a7c' : '#d8b45a'"
         />
+        <span>{{ label }}</span>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useGameStatusStore } from '@/stores/game/useGameStatusStore';
 import { BaseIcon } from '@/shared/ui';
 
+/**
+ * Small "actions unavailable" pill on the dock's top edge. It tells the
+ * player why taps like Equip or Use do nothing right now (game paused,
+ * loading, in a menu or conversation, dead), without covering anything.
+ * Short states (opening a menu for a moment) do not flash it: it waits
+ * SHOW_DELAY_MS before appearing.
+ */
+const SHOW_DELAY_MS = 700;
+
+const { t } = useI18n();
 const gameStatusStore = useGameStatusStore();
-const wsStore = useWebSocketStore();
-const { isConnected } = storeToRefs(wsStore);
-const { canAct, dead } = storeToRefs(gameStatusStore);
+const { isConnected } = storeToRefs(useWebSocketStore());
+const { canAct, dead, paused, loading, inMainMenu, inDialogue, controlsEnabled } = storeToRefs(gameStatusStore);
 
-// Non-blocking indicator: visible whenever the connection is live but the game
-// cannot accept actions. Navigation and data updates stay fully usable.
-const showIndicator = computed(() => isConnected.value && !canAct.value);
+const unavailable = computed(() => isConnected.value && !canAct.value);
+const visible = ref(false);
+let timer: ReturnType<typeof setTimeout> | null = null;
 
-const indicatorIconPath = computed(() =>
-  dead.value ? 'lorc/death-zone.svg' : 'lorc/sands-of-time.svg'
+watch(
+  unavailable,
+  (value) => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    if (!value) {
+      visible.value = false;
+      return;
+    }
+    timer = setTimeout(() => {
+      visible.value = true;
+    }, SHOW_DELAY_MS);
+  },
+  { immediate: true },
 );
+
+onBeforeUnmount(() => {
+  if (timer) clearTimeout(timer);
+});
+
+const iconPath = computed(() => (dead.value ? 'lorc/death-zone.svg' : 'lorc/sands-of-time.svg'));
+
+const label = computed(() => {
+  if (dead.value) return t('shared.ui.gameStatus.short.dead');
+  if (loading.value) return t('shared.ui.gameStatus.short.loading');
+  if (inMainMenu.value) return t('shared.ui.gameStatus.short.inMainMenu');
+  if (inDialogue.value) return t('shared.ui.gameStatus.short.inDialogue');
+  if (paused.value) return t('shared.ui.gameStatus.short.paused');
+  if (!controlsEnabled.value) return t('shared.ui.gameStatus.short.controlsDisabled');
+  return t('shared.ui.gameStatus.short.unavailable');
+});
 </script>
 
 <style scoped lang="scss">
 /*
- * Bottom, non-blocking "actions unavailable" indicator.
- *
- * A full-width frosted backdrop that fades upward via a radial mask,
- * anchored at the very bottom of the screen. The icon sits centred
- * above the arc. Pointer events are not intercepted — the app remains
- * fully interactive (view-only).
+ * Sits on the dock's top border (dock ≈ 52 px tall), centred. Never
+ * intercepts touches; the app stays fully usable (view-only).
  */
-.game-status-indicator {
+.game-status-pill {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-bottom: var(--spacing-lg);
-  pointer-events: none;
+  bottom: calc(52px - 10px + env(safe-area-inset-bottom));
+  left: 50%;
   z-index: var(--z-fixed);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 9px 0 7px;
+  background: rgb(12 11 9 / 88%);
+  border: 1px solid rgb(216 180 90 / 55%);
+  border-radius: 999px;
+  box-shadow: 0 1px 6px rgb(0 0 0 / 50%);
+  color: #d8b45a;
+  font-family: var(--font-heading);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+
+  &--dead {
+    border-color: rgb(224 138 124 / 60%);
+    color: #e08a7c;
+  }
 }
 
-.game-status-indicator__arc {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 180px;
-  background-color: var(--bg-overlay);
-  -webkit-mask-image: radial-gradient(
-    ellipse 120% 100% at 50% 100%,
-    #000 20%,
-    transparent 70%
-  );
-  mask-image: radial-gradient(
-    ellipse 120% 100% at 50% 100%,
-    #000 20%,
-    transparent 70%
-  );
-}
-
-.game-status-indicator__icon {
-  position: relative;
-  z-index: 1;
-  filter: drop-shadow(0 0 12px var(--skyrim-border-glow));
-}
-
-/* Indicator transition */
-.game-status-indicator-enter-active,
-.game-status-indicator-leave-active {
+.game-status-pill-enter-active,
+.game-status-pill-leave-active {
   transition:
     opacity var(--transition-normal),
     transform var(--transition-normal);
 }
 
-.game-status-indicator-enter-from,
-.game-status-indicator-leave-to {
+.game-status-pill-enter-from,
+.game-status-pill-leave-to {
   opacity: 0;
-  transform: translateY(var(--spacing-sm));
+  transform: translate(-50%, 4px);
 }
 </style>

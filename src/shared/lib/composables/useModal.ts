@@ -8,6 +8,7 @@ const modalProps = ref<Record<string, unknown>>({});
 const modalHandlers = ref<Record<string, (...args: any[]) => unknown>>({});
 const openedAtMs = ref(0);
 const ghostClickGuardMs = ref(0);
+const placement = ref<'center' | 'top'>('center');
 let onCloseCallback: (() => void) | null = null;
 
 function openModal(options: ModalOptions) {
@@ -16,6 +17,7 @@ function openModal(options: ModalOptions) {
   modalHandlers.value = options.on ?? {};
   openedAtMs.value = performance.now();
   ghostClickGuardMs.value = Math.max(0, options.ghostClickGuardMs ?? 0);
+  placement.value = options.placement ?? 'center';
   isOpen.value = true;
   onCloseCallback = options.onClose ?? null;
 }
@@ -42,6 +44,7 @@ export function useModal() {
     modalHandlers,
     openedAtMs,
     ghostClickGuardMs,
+    placement,
     openModal,
     closeModal,
   };

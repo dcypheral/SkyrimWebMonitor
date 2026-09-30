@@ -1,9 +1,13 @@
 <template>
-  <div class="inventory-list">
+  <div
+    class="inventory-list"
+    :class="{ 'inventory-list--preview-closed': !previewOpen }"
+  >
     <div class="list-wrapper">
       <div
         class="list"
         :class="{ 'list--grid': layout === 'grid' }"
+        @scroll.passive="onListScroll"
       >
         <!-- Grid of item tiles (inventory) -->
         <inventory-grid
@@ -110,6 +114,26 @@
       </div>
     </div>
 
+    <!-- Handle: lowers/raises the preview (narrow screens only). -->
+    <button
+      v-if="activeItemData"
+      type="button"
+      class="preview-handle"
+      :aria-expanded="previewOpen"
+      :aria-label="previewOpen ? $t('shared.ui.preview.hide') : $t('shared.ui.preview.show')"
+      @click="previewOpen = !previewOpen"
+    >
+      <span
+        class="preview-handle__caret"
+        :class="{ 'preview-handle__caret--up': !previewOpen }"
+        aria-hidden="true"
+      />
+      <span
+        v-if="!previewOpen"
+        class="preview-handle__name"
+      >{{ activeItemName }}</span>
+    </button>
+
     <div class="item-preview">
       <slot name="preview">
         <!-- Optional preview content goes here -->
@@ -127,6 +151,8 @@
               :keywords="activeInventoryItem.keywords"
               :framing="getItemFraming(activeInventoryItem)"
               :size="160"
+              expandable
+              :name="activeInventoryItem.name"
             />
             <base-icon
               v-else
@@ -141,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { BaseIcon } from '@/shared/ui';
 import { InventoryItem, BasePreview  } from '@/shared/ui/items';
 import { ItemThumbnail } from '@/entities/ui/icons';
@@ -234,10 +260,29 @@ const enabledActions = computed((): ToolbarActionItem[] => {
   return props.actions || [];
 });
 
+// ─── Preview panel (narrow screens) ─────────────────────────────────────
+// Tapping an item opens the preview; scrolling the list lowers it so the
+// grid gets the space; the handle raises/lowers it by hand.
+const previewOpen = ref(false);
+let lastScrollTop = 0;
+
+function onListScroll(event: Event): void {
+  const el = event.target;
+  if (!(el instanceof HTMLElement)) return;
+  if (previewOpen.value && Math.abs(el.scrollTop - lastScrollTop) > 12) previewOpen.value = false;
+  lastScrollTop = el.scrollTop;
+}
+
+const activeItemName = computed(() => {
+  const item = activeItemData.value;
+  return item && 'name' in item && typeof item.name === 'string' ? item.name : '';
+});
+
 function handleItemClick(formId: string) {
-  if (props.modelValue !== formId) {
-    // First click on new item - select it
+  if (props.modelValue !== formId || !previewOpen.value) {
+    // Tap: select and show the preview. A second tap on the shown item acts.
     emit('update:modelValue', formId);
+    previewOpen.value = true;
   } else {
     // Repeat click on already selected item - trigger action
     emit('item-double-click', formId);
@@ -377,21 +422,78 @@ function handleActionClick(actionEvent: string) {
     min-height: 0;
   }
 
-  .item-preview {
+  .preview-handle {
     order: 2;
+    display: flex;
+  }
+
+  .item-preview {
+    order: 3;
     flex: 0 0 auto;
     max-height: 40%;
-    padding-top: var(--spacing-sm);
-    border-top: 1px solid var(--skyrim-border-dark);
+    overflow: hidden;
+    transition: max-height var(--transition-normal), opacity var(--transition-normal);
 
     &:empty {
       display: none;
     }
   }
 
-  .inventory-toolbar {
-    order: 3;
+  .inventory-list--preview-closed .item-preview {
+    max-height: 0;
+    margin-top: calc(-1 * var(--spacing-sm));
+    opacity: 0;
   }
+
+  .inventory-toolbar {
+    order: 4;
+  }
+}
+
+/* Wide screens keep the side-by-side preview; the handle is not needed. */
+@media (width > 560px) {
+  .preview-handle {
+    display: none;
+  }
+}
+
+.preview-handle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 22px;
+  padding: 2px var(--spacing-sm);
+  background: none;
+  border: none;
+  border-top: 1px solid var(--skyrim-border-dark);
+  color: var(--skyrim-text-secondary);
+  font-family: var(--font-heading);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.preview-handle__caret {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--skyrim-text-secondary);
+  border-bottom: 2px solid var(--skyrim-text-secondary);
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform var(--transition-fast);
+
+  &--up {
+    transform: translateY(2px) rotate(-135deg);
+  }
+}
+
+.preview-handle__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
 }
 
 .list--grid {

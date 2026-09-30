@@ -11,6 +11,8 @@
         :keywords="data.keywords"
         framing="upright"
         :size="160"
+        expandable
+        :name="data.name"
       />
     </template>
   </base-preview>

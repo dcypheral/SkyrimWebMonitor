@@ -42,13 +42,16 @@
           "illusion": "Illusion",
           "restoration": "Restoration",
           "enchanting": "Enchanting",
-          "shouts": "Shouts"
+          "shouts": "Shouts",
+          "spellbook": "Spellbook",
+          "powers": "Powers"
         }
       },
       "quests": {
         "label": "Quests",
         "subtabs": {
-          "questsList": "Journal"
+          "questsList": "Quests",
+          "journal": "Journal"
         }
       },
       "map": {
@@ -152,6 +155,10 @@
         "xp": "Experience to next level",
         "gold": "Gold",
         "carry": "Carry weight"
+      },
+      "voice": {
+        "shouts": "Shouts",
+        "powers": "Powers"
       }
     },
     "character": {
@@ -379,6 +386,59 @@
         "colWalked": "Travelled",
         "colEvents": "Events"
       }
+    },
+    "spellbook": {
+      "search": "Search spells or effects",
+      "favorites": "Favorites only",
+      "all": "All schools",
+      "noMatches": "No spells match.",
+      "empty": "No spells yet.",
+      "left": "Left hand",
+      "right": "Right hand",
+      "bothHands": "Cast with both hands",
+      "unequip": "Unequip",
+      "cast": "Cast",
+      "delivery": "Target",
+      "casting": {
+        "FireAndForget": "Fire and forget",
+        "Concentration": "Concentration",
+        "ConstantEffect": "Constant",
+        "Scroll": "Scroll"
+      },
+      "deliveries": {
+        "Self": "Self",
+        "Touch": "Touch",
+        "Aimed": "Aimed",
+        "TargetActor": "Target actor",
+        "TargetLocation": "Target location"
+      },
+      "handShort": {
+        "left": "L",
+        "right": "R",
+        "both": "L+R"
+      },
+      "greater": "Greater power",
+      "lesser": "Lesser power",
+      "greaterHint": "once a day",
+      "lesserHint": "any time",
+      "noPowers": "No powers known.",
+      "useAsPower": "Use as power",
+      "inVoiceSlot": "In the power slot"
+    },
+    "records": {
+      "needPlugin": "General stats and active effects need the updated SkyrimWebSocket plugin (feature \"player.records\").",
+      "waiting": "Waiting for data…",
+      "noEffects": "No active effects.",
+      "unknownSource": "Other",
+      "tabs": {
+        "effects": "Active effects",
+        "General": "General",
+        "Quest": "Quests",
+        "Combat": "Combat",
+        "Magic": "Magic",
+        "Crafting": "Crafting",
+        "Crime": "Crime"
+      }
     }
   },
   "shared": {
@@ -424,7 +484,16 @@
         "inMainMenu": "Main menu is open.",
         "inDialogue": "You are in a conversation.",
         "dead": "You have died.",
-        "controlsDisabled": "Controls are disabled."
+        "controlsDisabled": "Controls are disabled.",
+        "short": {
+          "paused": "Paused",
+          "loading": "Loading",
+          "inMainMenu": "Main menu",
+          "inDialogue": "In conversation",
+          "dead": "Dead",
+          "controlsDisabled": "Controls off",
+          "unavailable": "Actions paused"
+        }
       },
       "itemMenu": {
         "equip": "Equip",
@@ -472,6 +541,18 @@
           "none": "No reaction",
           "unknown": "Unknown brew"
         }
+      },
+      "preview": {
+        "show": "Show details",
+        "hide": "Hide details"
+      },
+      "viewer": {
+        "open": "View {name} in 3D",
+        "close": "Close",
+        "hint": "Drag to turn · pinch to zoom · double-tap to reset",
+        "loading": "Loading model…",
+        "empty": "This model has nothing to show.",
+        "failed": "Could not load the model: {reason}"
       }
     }
   },
