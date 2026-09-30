@@ -2,27 +2,30 @@
   <button
     type="button"
     class="shout"
-    :class="{ 'shout--empty': !shout }"
+    :class="{ 'shout--empty': !shout, 'shout--compact': compact }"
     :aria-label="shout ? `${t('pages.home.shout')}: ${shout.name}` : t('pages.home.noShout')"
     @click="emit('pick')"
   >
     <base-icon
+      v-if="!compact"
       icon-path="lorc/shouting.svg"
       :size="18"
       :background-color="shout ? 'var(--skyrim-text-accent)' : 'var(--skyrim-text-dim)'"
     />
-    <span class="shout__name">{{ shout?.name ?? t('pages.home.noShout') }}</span>
-    <span
-      v-if="shout && shout.words.length"
-      class="shout__words"
+    <span class="shout__text">
+      <span class="shout__name">{{ shout?.name ?? t('pages.home.noShout') }}</span>
+      <span
+        v-if="shout && shout.words.length"
+        class="shout__words"
       :aria-label="t('pages.home.wordsKnown', { known: knownWords, total: shout.words.length })"
     >
       <span
         v-for="(word, i) in shout.words"
         :key="word.formId || i"
         class="shout__word"
-        :class="{ 'shout__word--known': word.isKnown }"
-      />
+          :class="{ 'shout__word--known': word.isKnown }"
+        />
+      </span>
     </span>
   </button>
 </template>
@@ -33,7 +36,14 @@ import { useI18n } from 'vue-i18n';
 import { BaseIcon } from '@/shared/ui';
 import type { ShoutItem } from '@/stores/magic/lib/types';
 
-const props = defineProps<{ shout: ShoutItem | null }>();
+const props = withDefaults(
+  defineProps<{
+    shout: ShoutItem | null;
+    /** Two-line layout (name over word marks) for narrow rows. */
+    compact?: boolean;
+  }>(),
+  { compact: false },
+);
 const emit = defineEmits<{ pick: [] }>();
 const { t } = useI18n();
 
@@ -66,6 +76,29 @@ const knownWords = computed(() => props.shout?.words.filter((w) => w.isKnown).le
   &--empty {
     border-color: var(--skyrim-border-medium);
     box-shadow: var(--shadow-soft);
+  }
+}
+
+.shout__text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+
+  .shout--compact & {
+    flex-direction: column;
+    gap: 3px;
+  }
+}
+
+.shout--compact {
+  min-height: 44px;
+  padding: 4px 12px 5px;
+
+  .shout__name {
+    max-width: 100%;
+    font-size: 0.78rem;
+    line-height: 1.1;
   }
 }
 

@@ -85,10 +85,14 @@
       "itemThumbnails": {
         "title": "Item thumbnails",
         "disable": "Use icons instead of 3D thumbnails",
-        "hint": "Weapons and apparel are rendered from the game's own models the first time you see them, then cached on this device.",
+        "hint": "Items are rendered from the game's own models the first time you see them, then cached on this device.",
         "clear": "Clear thumbnail cache",
         "clearing": "Clearing…",
-        "count": "Rendered this session: {count}"
+        "count": "Rendered this session: {count}",
+        "prefetch": "Download icons for the whole inventory",
+        "prefetchHint": "Renders every item once and keeps it on this device. Runs in the background while you play.",
+        "prefetchProgress": "Rendering… {count} left",
+        "prefetchDone": "Done: {count} items checked."
       },
       "updateDll": "Update SkyrimWebSocket.dll to use this feature"
     }
@@ -117,7 +121,20 @@
       "mapZoomIn": "Zoom in",
       "mapZoomOut": "Zoom out",
       "mapOpen": "Open the world map",
-      "north": "N"
+      "north": "N",
+      "bow": "Bow",
+      "quiver": "Quiver",
+      "bowPickerTitle": "Bows",
+      "ammoPickerTitle": "Arrows & bolts",
+      "noBows": "No bows in your inventory.",
+      "noAmmo": "No arrows in your inventory.",
+      "stats": {
+        "level": "Level {level}",
+        "lv": "LV",
+        "xp": "Experience to next level",
+        "gold": "Gold",
+        "carry": "Carry weight"
+      }
     },
     "character": {
       "stats": {
@@ -166,6 +183,24 @@
       },
       "potions": {
         "tab": "Potions"
+      },
+      "groups": {
+        "swords": "Swords",
+        "daggers": "Daggers",
+        "axes": "War axes",
+        "maces": "Maces",
+        "greatswords": "Greatswords",
+        "battleaxes": "Battleaxes & hammers",
+        "bows": "Bows",
+        "ammo": "Arrows & bolts",
+        "staves": "Staves",
+        "head": "Head",
+        "body": "Body",
+        "hands": "Hands",
+        "feet": "Feet",
+        "shields": "Shields",
+        "jewelry": "Jewelry",
+        "other": "Other"
       }
     },
     "magic": {
@@ -285,6 +320,53 @@
         "inDialogue": "You are in a conversation.",
         "dead": "You have died.",
         "controlsDisabled": "Controls are disabled."
+      },
+      "itemMenu": {
+        "equip": "Equip",
+        "unequip": "Unequip",
+        "use": "Use",
+        "consume": "Consume",
+        "read": "Read",
+        "favorite": "Favorite",
+        "unfavorite": "Unfavorite",
+        "hotkey": "Hotkey",
+        "drop": "Drop",
+        "valueWeight": "{value} gold · {weight} wt"
+      },
+      "sort": {
+        "title": "Sort",
+        "name": "Name",
+        "value": "Value",
+        "weight": "Weight",
+        "ratio": "Value / weight",
+        "power": "Power",
+        "count": "Quantity",
+        "groupByType": "Group by type"
+      },
+      "alchemy": {
+        "open": "Alchemy practice",
+        "back": "Satchel",
+        "reveal": "Spoilers",
+        "emptySlot": "Empty slot",
+        "unknownEffect": "Unknown effect",
+        "new": "new",
+        "pickHint": "Tap two or three ingredients to test a brew.",
+        "noReaction": "No shared effects. Nothing would brew.",
+        "teaches": "Brewing this teaches {count} new effect | Brewing this teaches {count} new effects",
+        "suggest": "Suggest an experiment",
+        "nothingToLearn": "Nothing left to learn with what you carry",
+        "clear": "Clear",
+        "knownOf": "{known} of {total} effects known",
+        "noIngredients": "No ingredients in your inventory.",
+        "progress": "Effects known: {known} / {total}",
+        "of": "{kind} of {effect}",
+        "kind": {
+          "potion": "Potion",
+          "poison": "Poison",
+          "mixed": "Impure brew",
+          "none": "No reaction",
+          "unknown": "Unknown brew"
+        }
       }
     }
   },

@@ -1,6 +1,7 @@
 <template>
   <inventory-list
     v-model="activeItem"
+    layout="grid"
     :items="potionsList"
     :active-item="activeItemData"
     :active-item-stats="previewStats"

@@ -1,6 +1,7 @@
 <template>
   <inventory-list
     v-model="activeItem"
+    layout="grid"
     :items="apparelList"
     :empty-message="$t('pages.inventory.apparel.waitingForData')"
     @favorite="toggleFavorite"

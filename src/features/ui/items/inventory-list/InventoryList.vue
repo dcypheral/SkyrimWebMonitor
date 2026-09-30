@@ -1,9 +1,22 @@
 <template>
   <div class="inventory-list">
     <div class="list-wrapper">
-      <div class="list">
+      <div
+        class="list"
+        :class="{ 'list--grid': layout === 'grid' }"
+      >
+        <!-- Grid of item tiles (inventory) -->
+        <inventory-grid
+          v-if="layout === 'grid' && gridItems.length > 0"
+          :items="gridItems"
+          :model-value="modelValue"
+          :sort-key="sortKey"
+          :grouped="grouped && canGroup"
+          @select="handleItemClick"
+          @menu="openItemMenu"
+        />
         <!-- Items list -->
-        <template v-if="items && items.length > 0">
+        <template v-else-if="layout === 'list' && items && items.length > 0">
           <slot
             v-for="(item, index) in items"
             :key="item.formId || index"
@@ -35,6 +48,22 @@
 
       <!-- Action toolbar -->
       <div class="inventory-toolbar">
+        <div class="toolbar-start">
+          <button
+            v-if="layout === 'grid'"
+            type="button"
+            class="btn toolbar-sort"
+          :aria-label="$t('shared.ui.sort.title')"
+          @click="openSortMenu"
+        >
+          <base-icon
+            icon-path="delapouite/funnel.svg"
+            :size="18"
+          />
+          <span>{{ $t(`shared.ui.sort.${sortKey}`) }}</span>
+        </button>
+          <slot name="toolbar-extra" />
+        </div>
         <template
           v-for="(actionItem, index) in enabledActions"
           :key="index"
@@ -91,7 +120,16 @@
           :effects="previewEffects"
         >
           <template #icon>
+            <item-thumbnail
+              v-if="activeInventoryItem"
+              :fallback-icon-path="previewIconPath"
+              :model-path="activeInventoryItem.modelPath"
+              :keywords="activeInventoryItem.keywords"
+              :framing="getItemFraming(activeInventoryItem)"
+              :size="160"
+            />
             <base-icon
+              v-else
               :icon-path="previewIconPath"
               :size="48"
             />
@@ -106,8 +144,18 @@
 import { computed } from 'vue';
 import { BaseIcon } from '@/shared/ui';
 import { InventoryItem, BasePreview  } from '@/shared/ui/items';
+import { ItemThumbnail } from '@/entities/ui/icons';
+import { useModal } from '@/shared/lib';
+import { sortKeysFor, type ItemSortKey } from '@/shared/lib/utils/itemSorting';
+import { getItemFraming } from '@/shared/lib/utils/itemVisual';
 import type { ItemEnchantmentEffect, ListItem } from '@/shared/lib/types';
+import type { InventoryItem as InventoryItemData } from '@/stores/inventory/lib/types';
 import type { PreviewStats } from '@/shared/ui/items/lib/types';
+import InventoryGrid from '../inventory-grid/InventoryGrid.vue';
+import ItemActionMenu from '../item-action-menu/ItemActionMenu.vue';
+import type { ItemMenuAction } from '../item-action-menu/types';
+import SortMenu from '../sort-menu/SortMenu.vue';
+import { useInventorySort } from '../composables/useInventorySort';
 
 interface ToolbarAction {
   id: string;
@@ -135,6 +183,8 @@ interface Props {
   activeItemStats?: PreviewStats[];
   previewEffects?: ItemEnchantmentEffect[];
   previewIconPath?: string;
+  /** `grid` shows item tiles with sorting, grouping and a long-press menu. */
+  layout?: 'list' | 'grid';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -157,6 +207,7 @@ const props = withDefaults(defineProps<Props>(), {
   activeItemStats: () => [],
   previewEffects: () => [],
   previewIconPath: 'lorc/cog.svg',
+  layout: 'list',
 });
 
 const emit = defineEmits<{
@@ -191,6 +242,68 @@ function handleItemClick(formId: string) {
     // Repeat click on already selected item - trigger action
     emit('item-double-click', formId);
   }
+}
+
+// ─── Grid mode ──────────────────────────────────────────────────────────
+
+function isInventoryItem(item: ListItem): item is InventoryItemData {
+  return 'categoryType' in item && 'count' in item && 'value' in item && 'weight' in item;
+}
+
+const gridItems = computed<InventoryItemData[]>(() => (props.items ?? []).filter(isInventoryItem));
+
+const activeInventoryItem = computed<InventoryItemData | null>(() => {
+  const item = activeItemData.value;
+  return item && isInventoryItem(item) ? item : null;
+});
+
+const canGroup = computed(() =>
+  gridItems.value.some((i) => i.categoryType === 'Weapon' || i.categoryType === 'Apparel'),
+);
+const sortCategory = computed(() => gridItems.value[0]?.categoryType ?? '');
+const { sortKey, grouped } = useInventorySort(sortCategory);
+
+const { openModal, closeModal } = useModal();
+
+function openSortMenu(): void {
+  openModal({
+    component: SortMenu,
+    props: {
+      keys: sortKeysFor(gridItems.value),
+      current: sortKey.value,
+      grouped: grouped.value,
+      canGroup: canGroup.value,
+    },
+    on: {
+      select: (key: ItemSortKey) => {
+        sortKey.value = key;
+        closeModal();
+      },
+      group: (value: boolean) => {
+        grouped.value = value;
+        closeModal();
+      },
+    },
+  });
+}
+
+function openItemMenu(formId: string): void {
+  const item = gridItems.value.find((i) => i.formId === formId);
+  if (!item) return;
+  emit('update:modelValue', formId);
+  openModal({
+    component: ItemActionMenu,
+    props: { item },
+    on: {
+      action: (action: ItemMenuAction) => {
+        closeModal();
+        if (action === 'activate') emit('item-double-click', formId);
+        else if (action === 'favorite') emit('favorite');
+        else if (action === 'hotkey') emit('hotkey');
+        else emit('drop');
+      },
+    },
+  });
 }
 
 function handleActionClick(actionEvent: string) {
@@ -279,6 +392,29 @@ function handleActionClick(actionEvent: string) {
   .inventory-toolbar {
     order: 3;
   }
+}
+
+.list--grid {
+  padding-right: 2px;
+}
+
+.toolbar-start {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-right: auto;
+}
+
+.toolbar-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 var(--spacing-md);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .toolbar-btn {

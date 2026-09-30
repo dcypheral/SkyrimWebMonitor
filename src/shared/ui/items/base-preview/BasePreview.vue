@@ -170,8 +170,8 @@ const displayName = computed(() => {
   }
 
   .base-preview :deep(.item-thumbnail) {
-    width: 72px;
-    height: 72px;
+    width: 96px;
+    height: 96px;
   }
 
   .base-preview .info {

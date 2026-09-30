@@ -11,7 +11,7 @@
         :model-path="data.modelPath"
         :keywords="data.keywords"
         :enchanted="!!data.enchantment"
-        :size="128"
+        :size="160"
         framing="diagonal"
       />
     </template>

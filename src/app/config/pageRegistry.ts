@@ -49,8 +49,23 @@ export const pagesRegistry: PagesRegistry = {
             healthBase: 'ActorValue::kHealth::Base',
             magickaBase: 'ActorValue::kMagicka::Base',
             staminaBase: 'ActorValue::kStamina::Base',
+            level: 'Player::Level',
+            xp: 'Player::XP::Current',
+            xpNext: 'Player::XP::Next',
+            inventoryWeight: 'Player::InventoryWeight',
+            carryWeight: 'Player::CarryWeight',
+            gold: 'Inventory::Gold',
           },
           settings: { frequency: 100 },
+        },
+        {
+          // Bow and quiver quick slots.
+          id: 'inventory.weapons',
+          fields: {
+            items: 'Inventory::Items::Weapons',
+            ammo: 'Inventory::Items::Ammo',
+          },
+          settings: { frequency: 1000 },
         },
         {
           id: 'hotkeys.items',

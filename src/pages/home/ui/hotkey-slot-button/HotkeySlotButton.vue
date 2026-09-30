@@ -37,7 +37,7 @@ import { useI18n } from 'vue-i18n';
 import { BaseIcon } from '@/shared/ui';
 import { getHotkeyIconPath } from '@/shared/lib/utils/hotkeyIcons';
 import type { HotkeySlotEntry } from '@/stores/hotkeys/lib/types';
-import { useLongPress } from '../../composables/useLongPress';
+import { useLongPress } from '@/shared/lib/composables/useLongPress';
 
 const props = withDefaults(
   defineProps<{

@@ -1,6 +1,7 @@
 <template>
   <inventory-list
     v-model="activeItem"
+    layout="grid"
     :items="miscList"
     @favorite="toggleFavorite"
     @hotkey="openHotkeyPicker"

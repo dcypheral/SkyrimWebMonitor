@@ -7,7 +7,7 @@
  * IndexedDB. Anything that fails keeps the tinted category icon.
  */
 import { defineStore } from 'pinia';
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { isThumbnailRenderingSupported, type ThumbnailFraming } from '@/shared/lib/nif';
 import { itemThumbnailsDisabled } from '@/shared/lib/settings/itemThumbnailsPreference';
 import { getItemMaterial } from '@/shared/lib/constants/itemMaterials';
@@ -15,6 +15,8 @@ import { logger } from '@/shared/lib/utils/logger';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useSystemStore } from '@/stores/system/useSystemStore';
 import { FEATURES } from '@/stores/system/lib/types';
+import { getItemFraming } from '@/shared/lib/utils/itemVisual';
+import type { InventoryItem } from '@/stores/inventory/lib/types';
 import { generateThumbnail, type ThumbnailJob } from './lib/generateThumbnail';
 import { clearThumbnails, readThumbnail, writeThumbnail } from './lib/thumbnailDb';
 
@@ -31,6 +33,31 @@ export function thumbnailKey(source: ThumbnailSource): string | null {
   if (!source.modelPath) return null;
   const material = getItemMaterial(source.keywords);
   return `v${THUMBNAIL_RENDER_VERSION}|${source.modelPath}|${material.id}|${source.framing}`;
+}
+
+const PREFETCH_FIELDS: Record<string, string> = {
+  weapons: 'Inventory::Items::Weapons',
+  ammo: 'Inventory::Items::Ammo',
+  apparel: 'Inventory::Items::Apparel',
+  food: 'Inventory::Items::Food',
+  potions: 'Inventory::Items::Potions',
+  ingredients: 'Inventory::Items::Ingredients',
+  scrolls: 'Inventory::Items::Scrolls',
+  keys: 'Inventory::Items::Keys',
+  books: 'Inventory::Items::Books',
+  misc: 'Inventory::Items::Misc',
+  gems: 'Inventory::Items::SoulGems',
+};
+
+const PREFETCH_TIMEOUT_MS = 15000;
+
+type PrefetchItem = Pick<InventoryItem, 'categoryType' | 'keywords'> & { modelPath: string };
+
+function isPrefetchItem(value: unknown): value is PrefetchItem {
+  if (typeof value !== 'object' || value === null) return false;
+  const modelPath: unknown = Reflect.get(value, 'modelPath');
+  const categoryType: unknown = Reflect.get(value, 'categoryType');
+  return typeof modelPath === 'string' && modelPath.length > 0 && typeof categoryType === 'string';
 }
 
 export const useItemThumbnailsStore = defineStore('itemThumbnails', () => {
@@ -61,26 +88,43 @@ export const useItemThumbnailsStore = defineStore('itemThumbnails', () => {
     return key ? (urls.get(key) ?? null) : null;
   }
 
-  function request(source: ThumbnailSource): void {
+  /**
+   * Queue a thumbnail. `visible` jumps ahead of everything (what the user is
+   * looking at now); `background` waits behind all other work, so the whole
+   * inventory gets rendered and cached once without slowing the screen.
+   */
+  function request(source: ThumbnailSource, priority: 'visible' | 'background' = 'visible'): void {
     const key = thumbnailKey(source);
     if (!key || !source.modelPath) return;
     if (urls.has(key) || failed.has(key)) return;
     if (!canRender()) return;
 
-    if (!queued.has(key)) {
+    const alreadyQueued = queued.has(key);
+    if (!alreadyQueued) {
       queued.set(key, {
         modelPath: source.modelPath,
         tint: getItemMaterial(source.keywords).rgb,
         framing: source.framing,
       });
-    } else {
-      // Already waiting: move to the front (it is visible again).
-      const index = order.indexOf(key);
-      if (index >= 0) order.splice(index, 1);
     }
-    order.push(key);
+
+    if (priority === 'background') {
+      if (!alreadyQueued) order.unshift(key); // processed last (queue pops from the end)
+    } else {
+      if (alreadyQueued) {
+        const index = order.indexOf(key);
+        if (index >= 0) order.splice(index, 1);
+      }
+      order.push(key);
+    }
     void processQueue();
   }
+
+  /** Number of thumbnails still waiting (for progress display). */
+  const pendingCount = computed(() => {
+    void generatedCount.value; // re-evaluate as work completes
+    return queued.size;
+  });
 
   async function processQueue(): Promise<void> {
     if (isProcessing.value) return;
@@ -136,6 +180,36 @@ export const useItemThumbnailsStore = defineStore('itemThumbnails', () => {
     }
   }
 
+  /**
+   * One query for every inventory category, then queue each item with a
+   * model as background work. Items already cached are skipped by request().
+   * Resolves with the number of items that have a model.
+   */
+  function prefetchInventory(): Promise<number> {
+    const websocket = useWebSocketStore();
+    if (!websocket.isConnected || !canRender()) return Promise.resolve(0);
+    return new Promise((resolve) => {
+      // Older plugins may not answer; do not leave the caller waiting forever.
+      const timeout = setTimeout(() => resolve(0), PREFETCH_TIMEOUT_MS);
+      websocket.sendQuery(`thumbnails.prefetch.${String(Date.now())}`, PREFETCH_FIELDS, (fields) => {
+        clearTimeout(timeout);
+        let count = 0;
+        for (const value of Object.values(fields)) {
+          if (!Array.isArray(value)) continue;
+          for (const raw of value) {
+            if (!isPrefetchItem(raw)) continue;
+            count++;
+            request(
+              { modelPath: raw.modelPath, keywords: raw.keywords, framing: getItemFraming(raw) },
+              'background',
+            );
+          }
+        }
+        resolve(count);
+      });
+    });
+  }
+
   /** Drop every cached thumbnail (memory + IndexedDB); they re-render on demand. */
   async function clearCache(): Promise<void> {
     urls.clear();
@@ -151,8 +225,10 @@ export const useItemThumbnailsStore = defineStore('itemThumbnails', () => {
     urls,
     isProcessing,
     generatedCount,
+    pendingCount,
     urlFor,
     request,
+    prefetchInventory,
     clearCache,
   };
 });

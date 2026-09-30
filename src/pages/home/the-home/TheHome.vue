@@ -17,11 +17,60 @@
         class="home__map"
         @open="nav.setActiveTab('map')"
       />
-      <div class="home__shout">
-        <shout-slot
-          :shout="equippedShout"
-          @pick="openShoutPicker"
+      <div
+        v-if="archeryPicker"
+        class="home__picker-scrim"
+        @click="archeryPicker = null"
+      />
+      <div class="home__combat">
+        <quick-picker
+          v-if="archeryPicker === 'bow'"
+          class="home__picker"
+          :title="t('pages.home.bowPickerTitle')"
+          :items="archery.bows.value"
+          fallback-icon="delapouite/bow-arrow.svg"
+          :empty-text="t('pages.home.noBows')"
+          @select="pickBow"
         />
+        <quick-picker
+          v-else-if="archeryPicker === 'ammo'"
+          class="home__picker"
+          :title="t('pages.home.ammoPickerTitle')"
+          :items="archery.ammo.value"
+          fallback-icon="lorc/arrow-cluster.svg"
+          :empty-text="t('pages.home.noAmmo')"
+          show-count
+          @select="pickAmmo"
+        />
+        <div class="home__combat-row">
+          <quick-slot
+            v-if="archery.hasArchery.value"
+            :item="archery.displayBow.value"
+            :label="t('pages.home.bow')"
+            fallback-icon="delapouite/bow-arrow.svg"
+            :active="!!archery.equippedBow.value"
+            :open="archeryPicker === 'bow'"
+            @tap="togglePicker('bow')"
+            @hold="archery.quickDrawBow"
+          />
+          <shout-slot
+            class="home__shout"
+            :shout="equippedShout"
+            :compact="archery.hasArchery.value"
+            @pick="openShoutPicker"
+          />
+          <quick-slot
+            v-if="archery.hasArchery.value"
+            :item="archery.equippedAmmo.value"
+            :label="t('pages.home.quiver')"
+            fallback-icon="delapouite/quiver.svg"
+            :active="!!archery.equippedAmmo.value"
+            :open="archeryPicker === 'ammo'"
+            :count="archery.equippedAmmo.value?.count ?? null"
+            @tap="togglePicker('ammo')"
+            @hold="archery.cycleAmmo"
+          />
+        </div>
       </div>
     </div>
 
@@ -49,8 +98,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
+import { useI18n } from 'vue-i18n';
 import { useModal } from '@/shared/lib';
 import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
 import { useMagicStore } from '@/stores/magic/useCharacterSpellStore';
@@ -64,7 +114,10 @@ import MiniMap from '../ui/mini-map/MiniMap.vue';
 import QuestObjectiveCard from '../ui/quest-objective-card/QuestObjectiveCard.vue';
 import ShoutSlot from '../ui/shout-slot/ShoutSlot.vue';
 import ShoutPicker from '../ui/shout-picker/ShoutPicker.vue';
+import QuickSlot from '../ui/quick-slot/QuickSlot.vue';
+import QuickPicker from '../ui/quick-picker/QuickPicker.vue';
 import { useTrackedQuest } from '../composables/useTrackedQuest';
+import { useArcheryLoadout } from '../composables/useArcheryLoadout';
 
 const nav = useNavigationStore();
 const ws = useWebSocketStore();
@@ -79,6 +132,27 @@ const { shoutsList } = storeToRefs(magicStore);
 const equippedShout = computed(() => shoutsList.value.find((s) => s.isEquipped) ?? null);
 
 const tracked = useTrackedQuest();
+const { t } = useI18n();
+
+// ─── Bow and quiver ─────────────────────────────────────────────────────
+// Tap a slot: a strip of choices opens above it; tap a choice to equip.
+// Hold the bow: draw the last bow. Hold the quiver: next arrow type.
+const archery = useArcheryLoadout();
+const archeryPicker = ref<'bow' | 'ammo' | null>(null);
+
+function togglePicker(kind: 'bow' | 'ammo'): void {
+  archeryPicker.value = archeryPicker.value === kind ? null : kind;
+}
+
+function pickBow(formId: string): void {
+  archery.equipBow(formId);
+  archeryPicker.value = null;
+}
+
+function pickAmmo(formId: string): void {
+  archery.equipAmmo(formId);
+  archeryPicker.value = null;
+}
 
 function triggerSlot(entry: HotkeySlotEntry): void {
   ws.sendCommand({ command: 'hotkey_trigger', slot: entry.slot });
@@ -124,7 +198,7 @@ function openShoutPicker(): void {
  *   │ 1 │                │ 5 │
  *   │ 2 │    mini-map    │ 6 │
  *   │ 3 │                │ 7 │
- *   │ 4 │   [ shout ]    │ 8 │
+ *   │ 4 │ (bow) shout (q)│ 8 │
  *   ├──── quest objective ───┤
  *
  * Hotkey columns flank the map, like a handheld console's touch screen.
@@ -179,13 +253,43 @@ function openShoutPicker(): void {
   flex: 1;
 }
 
-.home__shout {
+/* Bow · shout · quiver float over the bottom of the map. */
+.home__combat {
   position: absolute;
-  bottom: var(--spacing-sm);
-  left: 50%;
+  right: var(--spacing-xs);
+  bottom: var(--spacing-xs);
+  left: var(--spacing-xs);
   z-index: 3;
-  width: min(100% - 2 * var(--spacing-sm), 320px);
-  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.home__combat-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.home__shout {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.home__picker-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: rgb(0 0 0 / 35%);
+  border-radius: var(--radius-lg);
 }
 
 .home__quest {

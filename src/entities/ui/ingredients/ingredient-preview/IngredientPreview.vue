@@ -4,9 +4,13 @@
     :stats="stats"
   >
     <template #icon>
-      <base-icon
-        icon-path="skoll/pestle-mortar.svg"
-        :size="48"
+      <item-thumbnail
+        v-if="data"
+        fallback-icon-path="skoll/pestle-mortar.svg"
+        :model-path="data.modelPath"
+        :keywords="data.keywords"
+        framing="upright"
+        :size="160"
       />
     </template>
     <template #effect>
@@ -35,7 +39,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BasePreview } from '@/shared/ui/items';
-import { BaseIcon } from '@/shared/ui';
+import { ItemThumbnail } from '@/entities/ui/icons';
 import { getRoundValue } from '@/shared/lib/utils/getDescriptionValues';
 import type { IngredientItem } from '@/stores/inventory/lib/types';
 

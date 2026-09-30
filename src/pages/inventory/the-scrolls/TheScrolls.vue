@@ -1,6 +1,7 @@
 <template>
   <inventory-list
     v-model="activeItem"
+    layout="grid"
     :items="scrollsList"
     :active-item="activeItemData"
     :active-item-stats="previewStats"

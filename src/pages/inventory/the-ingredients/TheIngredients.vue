@@ -1,6 +1,12 @@
 <template>
+  <alchemy-lab
+    v-if="isLabOpen"
+    @close="isLabOpen = false"
+  />
   <inventory-list
+    v-else
     v-model="activeItem"
+    layout="grid"
     :items="ingredientsList"
     :active-item="activeItemData"
     :active-item-stats="previewStats"
@@ -10,6 +16,20 @@
     @drop="startDrop"
     @item-double-click="useItem"
   >
+    <template #toolbar-extra>
+      <button
+        type="button"
+        class="btn btn-icon lab-open"
+        :aria-label="t('shared.ui.alchemy.open')"
+        :title="t('shared.ui.alchemy.open')"
+        @click="isLabOpen = true"
+      >
+        <base-icon
+          icon-path="lorc/cauldron.svg"
+          :size="20"
+        />
+      </button>
+    </template>
     <template #preview>
       <ingredient-preview
         v-if="isIngredientItem(activeItemData)"
@@ -20,10 +40,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
-import { InventoryList } from '@/features/ui';
+import { AlchemyLab, InventoryList } from '@/features/ui';
+import { BaseIcon } from '@/shared/ui';
 import { useInventoryStore } from '@/stores/inventory/useInventoryStore';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useInventoryItemActions } from '@/pages/inventory/composables/useInventoryItemActions';
@@ -35,6 +56,7 @@ const inventoryStore = useInventoryStore();
 const { ingredientsList } = storeToRefs(inventoryStore);
 const wsStore = useWebSocketStore();
 const { t } = useI18n();
+const isLabOpen = ref(false);
 
 const {
   activeItem,
@@ -65,5 +87,7 @@ function useItem(formId: string) {
 </script>
 
 <style scoped lang="scss">
-// Component uses InventoryList styles
+.lab-open {
+  --skyrim-text-accent: var(--skyrim-accent-main);
+}
 </style>

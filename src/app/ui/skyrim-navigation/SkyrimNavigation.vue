@@ -1,8 +1,37 @@
 <template>
   <header class="navigation-header">
     <div class="header-row">
+      <!-- Icon strip: every category fits, no horizontal scrolling. -->
       <nav
-        v-if="visibleSubTabs.length > 0"
+        v-if="iconStrip"
+        class="cat-strip animate-fade-in"
+        role="tablist"
+        :aria-label="$t('app.navigation.subAriaLabel')"
+      >
+        <button
+          v-for="sub in visibleSubTabs"
+          :key="sub.id"
+          type="button"
+          class="cat-strip__item"
+          :class="{ 'cat-strip__item--active': nav.activeSubTab === sub.id }"
+          role="tab"
+          :aria-selected="nav.activeSubTab === sub.id"
+          :aria-label="getSubtabLabel(sub)"
+          @click="nav.setActiveSubTab(sub.id)"
+        >
+          <base-icon
+            :icon-path="iconStrip[sub.id]"
+            :size="20"
+            :background-color="nav.activeSubTab === sub.id ? 'var(--skyrim-accent-main)' : 'var(--skyrim-text-dim)'"
+          />
+          <span
+            v-if="nav.activeSubTab === sub.id"
+            class="cat-strip__label"
+          >{{ getSubtabLabel(sub) }}</span>
+        </button>
+      </nav>
+      <nav
+        v-else-if="visibleSubTabs.length > 0"
         ref="subtabsRef"
         class="subtab-bar header-subtabs animate-fade-in"
         role="tablist"
@@ -48,6 +77,7 @@
 import { computed, ref, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BaseIcon } from '@/shared/ui';
+import { MAGIC_SCHOOL_ICON_PATHS } from '@/shared/lib/constants/magicSchoolIcons';
 import { useModal } from '@/shared/lib';
 import { SettingsModalContent } from '@/features/settings';
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
@@ -59,6 +89,40 @@ const { t } = useI18n();
 const { openModal } = useModal();
 
 const visibleSubTabs = computed(() => nav.getVisibleSubTabs());
+const SUBTAB_ICONS: Record<string, string> = {
+  // Inventory
+  weapons: 'lorc/crossed-swords.svg',
+  apparel: 'lorc/lamellar.svg',
+  potions: 'lorc/potion-ball.svg',
+  scrolls: 'lorc/tied-scroll.svg',
+  food: 'lorc/shiny-apple.svg',
+  ingredients: 'skoll/pestle-mortar.svg',
+  books: 'lorc/open-book.svg',
+  keys: 'lorc/key.svg',
+  misc: 'lorc/swap-bag.svg',
+  // Magic
+  destruction: MAGIC_SCHOOL_ICON_PATHS.Destruction,
+  alteration: MAGIC_SCHOOL_ICON_PATHS.Alteration,
+  conjuration: MAGIC_SCHOOL_ICON_PATHS.Conjuration,
+  illusion: MAGIC_SCHOOL_ICON_PATHS.Illusion,
+  restoration: MAGIC_SCHOOL_ICON_PATHS.Restoration,
+  enchanting: 'lorc/crystal-wand.svg',
+  shouts: MAGIC_SCHOOL_ICON_PATHS.Shouts,
+};
+
+/** Icon map for the current sub-tabs when every one has an icon, else null. */
+const iconStrip = computed<Record<string, string> | null>(() => {
+  const subs = visibleSubTabs.value;
+  if (subs.length < 3) return null;
+  const map: Record<string, string> = {};
+  for (const sub of subs) {
+    const icon = SUBTAB_ICONS[sub.id.toLowerCase()];
+    if (!icon) return null;
+    map[sub.id] = icon;
+  }
+  return map;
+});
+
 const activeTabLabel = computed(() => nav.tabs.find((tab) => tab.id === nav.activeTab)?.label ?? '');
 
 // Center the active item in the horizontally scrollable container.
@@ -147,6 +211,60 @@ watch(
 
 .header-subtabs > .subtab:last-child {
   margin-right: auto;
+}
+
+.cat-strip {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: stretch;
+  min-width: 0;
+  padding-inline: max(var(--spacing-xs), env(safe-area-inset-left)) var(--spacing-xs);
+}
+
+.cat-strip__item {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: flex-grow var(--transition-normal);
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 20%;
+    bottom: 0;
+    left: 20%;
+    height: 2px;
+    background: transparent;
+  }
+
+  /* The active category expands to show its name. */
+  &--active {
+    flex-grow: 2.6;
+
+    &::after {
+      background: var(--skyrim-accent-main);
+    }
+  }
+}
+
+.cat-strip__label {
+  overflow: hidden;
+  font-family: var(--font-heading);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--skyrim-text-primary);
 }
 
 .header-title {
