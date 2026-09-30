@@ -25,6 +25,13 @@
       </symbol>
     </defs>
 
+    <journey-layer
+      ref="journeyRef"
+      :scale="scale"
+      :project-world-to-image="projectWorldToImage"
+      :current-worldspace="currentWorldspace"
+    />
+
     <location-markers
       :markers="locationMarkers"
       :marker-max-size-by-key="markerMaxSizeByKey"
@@ -91,13 +98,15 @@ import LocationMarkers from '../components/location-markers/LocationMarkers.vue'
 import QuestMarkers from '../components/quest-markers/QuestMarkers.vue';
 import PlayerMarker from '../components/player-marker/PlayerMarker.vue';
 import SelectedMarkerLabel from '../components/selected-marker-label/SelectedMarkerLabel.vue';
+import JourneyLayer from '../components/journey-layer/JourneyLayer.vue';
+import { useNoteActions } from '@/features/journey';
 import { isLocationMarker, isQuestMarker, type ProjectedMarker } from '../lib/types';
 import { useMapHotspotsStore } from '@/stores/map/useMapHotspotsStore';
 import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useModal } from '@/shared/lib/composables/useModal';
 
-void [LocationMarkers, QuestMarkers, PlayerMarker, SelectedMarkerLabel];
+void [LocationMarkers, QuestMarkers, PlayerMarker, SelectedMarkerLabel, JourneyLayer];
 
 // =============================================================
 // Props
@@ -221,7 +230,17 @@ function clearSelection(): void {
  * Markers themselves are `pointer-events: none` so the underlying OSD
  * canvas always receives pan/pinch gestures uninterrupted.
  */
+const journeyRef = ref<InstanceType<typeof JourneyLayer> | null>(null);
+const noteActions = useNoteActions();
+
 function handleClickAt(imgX: number, imgY: number): boolean {
+  // Note pins sit above location markers.
+  const noteId = journeyRef.value?.hitNote(imgX, imgY) ?? null;
+  if (noteId !== null) {
+    clearSelection();
+    noteActions.openNote(noteId, { showMapButton: false });
+    return true;
+  }
   if (markerMaxSize.value <= 0) return false;
 
   // Markers are drawn anchored at (m.x, m.y) with the icon tip at the
@@ -255,7 +274,11 @@ function handleClickAt(imgX: number, imgY: number): boolean {
   return false;
 }
 
-defineExpose({ clearSelection, handleClickAt });
+function sessionBounds(sessionId: number) {
+  return journeyRef.value?.sessionBounds(sessionId) ?? null;
+}
+
+defineExpose({ clearSelection, handleClickAt, sessionBounds });
 
 /**
  * Marker size in image-natural-pixel units for a given icon size modifier.

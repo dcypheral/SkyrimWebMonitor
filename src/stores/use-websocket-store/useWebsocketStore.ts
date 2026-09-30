@@ -3,7 +3,17 @@ import { ref, computed } from 'vue';
 import { getWebSocketClient } from '@/api/websocket';
 import { CONNECTION_STATUS } from '@/shared/lib/constants/connection';
 import { saveConfiguredWsUrl } from '@/shared/lib/config/websocket';
-import type { DataMessage, ServerMessage, CommandResultMessage, SendCommandOptions, FileDownloadResultData, TexturePreviewResultData } from '@/api/websocket';
+import type {
+  DataMessage,
+  ServerMessage,
+  CommandResultMessage,
+  SendCommandOptions,
+  FileDownloadResultData,
+  TexturePreviewResultData,
+  ScreenshotTakeResultData,
+  ScreenshotListResultData,
+  ScreenshotGetResultData,
+} from '@/api/websocket';
 import { DataRouter } from '@/stores/adapters/dataRouter';
 import type { Subscription } from './lib/types';
 import { SYSTEM_QUERY_ID, SYSTEM_QUERY_FIELDS, useSystemStore } from '@/stores/system/useSystemStore';
@@ -18,6 +28,18 @@ function isFileDownloadResult(data: unknown): data is FileDownloadResultData {
 
 function isTexturePreviewResult(data: unknown): data is TexturePreviewResultData {
   return typeof data === 'object' && data !== null && 'imageBase64' in data && typeof data.imageBase64 === 'string';
+}
+
+function isScreenshotTakeResult(data: unknown): data is ScreenshotTakeResultData {
+  return typeof data === 'object' && data !== null && 'queued' in data && typeof data.queued === 'boolean';
+}
+
+function isScreenshotListResult(data: unknown): data is ScreenshotListResultData {
+  return typeof data === 'object' && data !== null && 'files' in data && Array.isArray(data.files);
+}
+
+function isScreenshotGetResult(data: unknown): data is ScreenshotGetResultData {
+  return typeof data === 'object' && data !== null && 'dataBase64' in data && typeof data.dataBase64 === 'string';
 }
 
 export const useWebSocketStore = defineStore('websocket', () => {
@@ -236,6 +258,20 @@ export const useWebSocketStore = defineStore('websocket', () => {
       isTexturePreviewResult,
     );
 
+  /** Queue one engine screenshot (feature "screenshots"). */
+  const takeScreenshot = (): Promise<ScreenshotTakeResultData> =>
+    runBackgroundCommand({ command: 'screenshot_take' }, isScreenshotTakeResult);
+
+  const listScreenshots = (limit?: number): Promise<ScreenshotListResultData> =>
+    runBackgroundCommand({ command: 'screenshot_list', ...(limit !== undefined && { limit }) }, isScreenshotListResult);
+
+  /** maxSize > 0 returns a scaled JPEG; 0 returns the original file. */
+  const getScreenshot = (name: string, maxSize?: number): Promise<ScreenshotGetResultData> =>
+    runBackgroundCommand(
+      { command: 'screenshot_get', name, ...(maxSize !== undefined && { maxSize }) },
+      isScreenshotGetResult,
+    );
+
   const connect = async (): Promise<void> => {
     const requestId = ++connectionRequestId;
 
@@ -392,6 +428,9 @@ export const useWebSocketStore = defineStore('websocket', () => {
     sendCommand,
     downloadFile,
     texturePreview,
+    takeScreenshot,
+    listScreenshots,
+    getScreenshot,
     setCommandsEnabled,
     $dispose: cleanup,
   };

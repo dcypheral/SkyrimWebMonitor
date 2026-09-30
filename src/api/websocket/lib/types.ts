@@ -25,7 +25,10 @@ export type CommandType =
   | 'fast_travel'
   | 'read_book'
   | 'file_download'
-  | 'texture_preview';
+  | 'texture_preview'
+  | 'screenshot_take'
+  | 'screenshot_list'
+  | 'screenshot_get';
 
 export type EquipHand = EquippedHand;
 
@@ -95,8 +98,12 @@ export interface SendCommandOptions {
   y?: number;
   z?: number;
   path?: string;
-  /** texture_preview: cap the longest side of the returned PNG. */
+  /** texture_preview / screenshot_get: cap the longest side of the returned image. */
   maxSize?: number;
+  /** screenshot_get: file name from screenshot_list. */
+  name?: string;
+  /** screenshot_list: maximum number of files. */
+  limit?: number;
 }
 
 export type ClientMessage =
@@ -141,12 +148,44 @@ export interface TexturePreviewResultData {
   imageBase64: string;
 }
 
+export interface ScreenshotTakeResultData {
+  queued: boolean;
+}
+
+export interface ScreenshotFileInfo {
+  name: string;
+  size: number;
+  /** Unix seconds. */
+  modified: number;
+}
+
+export interface ScreenshotListResultData {
+  directory: string;
+  baseName: string;
+  total: number;
+  files: ScreenshotFileInfo[];
+}
+
+export interface ScreenshotGetResultData {
+  name: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  size: number;
+  dataBase64: string;
+}
+
 export interface CommandResultMessage extends BaseMessage {
   type: 'commandResult';
   id: string;
   success: boolean;
   error?: string;
-  data?: FileDownloadResultData | TexturePreviewResultData;
+  data?:
+    | FileDownloadResultData
+    | TexturePreviewResultData
+    | ScreenshotTakeResultData
+    | ScreenshotListResultData
+    | ScreenshotGetResultData;
 }
 
 export type ServerMessage =

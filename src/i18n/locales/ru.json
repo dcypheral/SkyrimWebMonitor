@@ -52,7 +52,11 @@
         }
       },
       "map": {
-        "label": "Карта"
+        "label": "Карта",
+        "subtabs": {
+          "view": "Карта",
+          "journal": "Журнал"
+        }
       }
     },
     "content": {
@@ -94,7 +98,16 @@
         "prefetchProgress": "Отрисовка… осталось {count}",
         "prefetchDone": "Готово: проверено предметов — {count}."
       },
-      "updateDll": "Обновите SkyrimWebSocket.dll для использования этой возможности"
+      "updateDll": "Обновите SkyrimWebSocket.dll для использования этой возможности",
+      "journey": {
+        "title": "Путь героя",
+        "record": "Записывать путь и журнал сессий",
+        "objectives": "Записывать выполненные цели",
+        "hint": "Запись идёт, пока приложение подключено: одна точка в секунду, хранится на устройстве.",
+        "storage": "Сессий: {sessions}, заметок: {notes}, занято около {size}",
+        "deleteAll": "Удалить все данные журнала",
+        "confirmDeleteAll": "Нажмите ещё раз, чтобы удалить всё"
+      }
     }
   },
   "pages": {
@@ -274,6 +287,93 @@
       "prefetch": {
         "label": "Загрузка карты",
         "progress": "{progress}%"
+      },
+      "tab": "Карта"
+    },
+    "journal": {
+      "tab": "Журнал",
+      "newNote": "Новая заметка",
+      "editNote": "Изменить заметку",
+      "notePlaceholder": "Что здесь произошло?",
+      "removePhoto": "Убрать фото",
+      "addPhoto": "Фото",
+      "gameScreenshot": "Снимок игры",
+      "capturing": "Снимаю…",
+      "inside": "Внутри: {place}",
+      "pinned": "Отмечено на карте",
+      "pinHere": "Метка там, где вы стоите",
+      "noPin": "Без позиции на карте",
+      "noPinShort": "без метки",
+      "photoFailed": "Не удалось прочитать фото.",
+      "screenshotFailed": "Снимок не удался: {reason}",
+      "noteLimit": "Достигнут предел заметок ({max}). Удалите или экспортируйте старые.",
+      "showOnMap": "Показать на карте",
+      "confirmDelete": "Нажмите ещё раз для удаления",
+      "layerPath": "Путь героя",
+      "layerNotes": "Заметки",
+      "clearFocus": "Показать все сессии",
+      "recording": "идёт",
+      "noSessions": "Сессий пока нет. Играйте с подключённым приложением, чтобы начать журнал.",
+      "back": "Назад",
+      "titlePlaceholder": "Название сессии",
+      "levelOnly": "Уровень {level}",
+      "levelRange": "Уровень {from} → {to}",
+      "export": "Экспорт",
+      "exportAll": "Экспорт всего",
+      "exportNotes": "Экспорт заметок",
+      "exportFailed": "Ошибка экспорта: {reason}",
+      "savedTo": "Сохранено: {location}",
+      "share": "Поделиться",
+      "noEvents": "Пока ничего не записано.",
+      "event": {
+        "note": "Заметка: {text}",
+        "level": "Достигнут уровень {level}",
+        "objective": "{objective} ({quest})",
+        "quest": "Задание выполнено: {quest}",
+        "location": "Вход: {place}"
+      },
+      "searchNotes": "Поиск по заметкам",
+      "noMatches": "Ничего не найдено.",
+      "noNotes": "Заметок пока нет. Нажмите перо на карте главного экрана.",
+      "photoNote": "Фото",
+      "tabs": {
+        "sessions": "Сессии",
+        "notes": "Заметки",
+        "shots": "Снимки"
+      },
+      "shots": {
+        "intro": "Тест: плагин просит игру сделать снимок (как PrintScreen), затем приложение скачивает уменьшенную копию.",
+        "needPlugin": "Нужна обновлённая версия плагина SkyrimWebSocket (функция \"screenshots\").",
+        "take": "Сделать снимок",
+        "refresh": "Обновить список",
+        "saveAsNote": "Сохранить как заметку",
+        "folder": "Папка: {folder} (файлов: {total})",
+        "none": "Файлов снимков пока нет.",
+        "failed": "Ошибка: {reason}",
+        "waiting": "Жду, пока игра запишет файл…",
+        "ok": "Снимок получен.",
+        "saved": "Сохранено как заметка."
+      },
+      "md": {
+        "level": "Достигнут уровень {level}",
+        "objective": "Цель выполнена: *{quest}*: {objective}",
+        "quest": "Задание выполнено: **{quest}**",
+        "entered": "Вход: {place}",
+        "note": "Заметка: {text}",
+        "photo": "Фото",
+        "played": "Время игры {time}",
+        "walked": "Пройдено {distance}",
+        "levelOnly": "Уровень {level}",
+        "levelRange": "Уровень {from} → {to}",
+        "timeline": "Хронология",
+        "notes": "Заметки",
+        "allNotes": "Все заметки",
+        "journalTitle": "Журнал Skyrim",
+        "totals": "Сессий: {sessions} · в игре {time} · пройдено {distance}",
+        "colSession": "Сессия",
+        "colPlayed": "В игре",
+        "colWalked": "Пройдено",
+        "colEvents": "События"
       }
     }
   },
@@ -377,7 +477,10 @@
     "removeFromFavorites": "Удалить из избранного",
     "dropItem": "Выбросить предмет",
     "weight": "Вес",
-    "value": "Стоимость"
+    "value": "Стоимость",
+    "save": "Сохранить",
+    "edit": "Изменить",
+    "delete": "Удалить"
   },
   "entities": {
     "spell": {

@@ -17,6 +17,67 @@
         :project-world-to-image="projectWorldToImage"
         :current-worldspace="currentMapWorldspace"
       />
+      <div class="map-layer-controls">
+        <button
+          type="button"
+          class="map-ctrl"
+          :class="{ 'is-active': journeyLayers.path }"
+          :aria-pressed="journeyLayers.path"
+          :aria-label="$t('pages.journal.layerPath')"
+          @click="journeyLayers.path = !journeyLayers.path"
+        >
+          <base-icon
+            icon-path="delapouite/trail.svg"
+            :size="18"
+            :background-color="journeyLayers.path ? '#f3c45e' : 'var(--skyrim-text-dim)'"
+          />
+        </button>
+        <button
+          type="button"
+          class="map-ctrl"
+          :class="{ 'is-active': journeyLayers.notes }"
+          :aria-pressed="journeyLayers.notes"
+          :aria-label="$t('pages.journal.layerNotes')"
+          @click="journeyLayers.notes = !journeyLayers.notes"
+        >
+          <base-icon
+            icon-path="lorc/quill-ink.svg"
+            :size="18"
+            :background-color="journeyLayers.notes ? '#f2e6c4' : 'var(--skyrim-text-dim)'"
+          />
+        </button>
+      </div>
+      <div
+        v-if="focusSession"
+        class="map-focus-chip"
+      >
+        <span>{{ focusSessionLabel }}</span>
+        <button
+          type="button"
+          :aria-label="$t('pages.journal.clearFocus')"
+          @click="journeyLayers.focusSessionId = null"
+        >
+          ×
+        </button>
+      </div>
+      <div class="map-zoom-controls">
+        <button
+          type="button"
+          class="map-ctrl"
+          :aria-label="$t('pages.home.mapZoomIn')"
+          @click="zoomBy(ZOOM_BUTTON_STEP)"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          class="map-ctrl"
+          :aria-label="$t('pages.home.mapZoomOut')"
+          @click="zoomBy(1 / ZOOM_BUTTON_STEP)"
+        >
+          −
+        </button>
+      </div>
       <button
         type="button"
         class="map-follow-player-btn"
@@ -77,6 +138,9 @@ import { getMapConfig } from '../config/mapRegistry';
 import type { MapConfig } from '../config/lib/types';
 import { currentZoom } from '@/shared/lib/composables/useAppZoom';
 import { logger } from '@/shared/lib/utils/logger';
+import { journeyLayers } from '@/shared/lib/settings/journeyLayers';
+import { mapFocusRequest } from '@/stores/journey/mapFocus';
+import { useJourneyStore } from '@/stores/journey/useJourneyStore';
 
 // =============================================================
 // Map view configuration
@@ -93,8 +157,15 @@ vips dzsave public/maps/<name>.png public/map-dzi/<name> \
 */
 /** Initial zoom factor relative to the "cover" home zoom. */
 const INITIAL_ZOOM_FACTOR = 2.5;
-/** Max zoom factor relative to home zoom. */
-const MAX_ZOOM_FACTOR = 1;
+/**
+ * Deepest zoom: screen pixels per map image pixel. Past 1 the tiles are
+ * upscaled (softer), which is fine for reading paths and pins up close.
+ */
+const MAX_ZOOM_PIXEL_RATIO = 4;
+/** Zoom step of the +/− buttons. */
+const ZOOM_BUTTON_STEP = 1.8;
+/** Zoom used when jumping to a note ("Show on map"). */
+const FOCUS_ZOOM_FACTOR = 8;
 /** Background color around the map. */
 const BACKGROUND_COLOR = 'var(--skyrim-bg-medium)';
 
@@ -328,6 +399,97 @@ function applyHomeBounds(): void {
   syncOverlayTransform();
 }
 
+/**
+ * Let the player zoom out until the whole map fits (the default minimum is
+ * "cover", which always crops part of the map on non-square screens).
+ */
+function allowZoomOutToFit(): void {
+  if (!viewer || !imgNaturalW.value) return;
+  const cw = containerWidth.value;
+  const ch = containerHeight.value;
+  if (!cw || !ch) return;
+  const config = mapConfig.value;
+  const croppedW = imgNaturalW.value - 2 * config.cropX;
+  const croppedH = imgNaturalH.value - config.cropYTop - config.cropYBottom;
+  if (croppedW <= 0 || croppedH <= 0) return;
+  // The cropped map spans 1 viewport unit in width (see the 'open' handler):
+  // at zoom z the screen shows 1/z units across.
+  const fitZoom = Math.min(1, (ch / cw) * (croppedW / croppedH));
+  // `minZoomLevel` is a documented Viewport field missing from the typings.
+  Reflect.set(viewer.viewport, 'minZoomLevel', fitZoom);
+}
+
+function zoomBy(factor: number): void {
+  if (!viewer) return;
+  stopFollowPlayerByUser();
+  viewer.viewport.zoomBy(factor);
+  viewer.viewport.applyConstraints();
+}
+
+/** Center on world coordinates and zoom in (note "Show on map"). */
+function focusWorldPoint(x: number, y: number): boolean {
+  if (!viewer) return false;
+  const item = viewer.world.getItemAt(0);
+  if (!item) return false;
+  const p = projectWorldToImage.value({ x, y });
+  if (!p) return false;
+  isFollowPlayerMode.value = false;
+  const target = item.imageToViewportCoordinates(p.x, p.y, true);
+  viewer.viewport.zoomTo(viewer.viewport.getHomeZoom() * FOCUS_ZOOM_FACTOR, undefined, true);
+  viewer.viewport.panTo(target, true);
+  viewer.viewport.applyConstraints(true);
+  syncOverlayTransform();
+  return true;
+}
+
+/** Zoom to show a whole session's path. */
+function fitSession(sessionId: number): boolean {
+  if (!viewer) return false;
+  const item = viewer.world.getItemAt(0);
+  const box = markersRef.value?.sessionBounds(sessionId);
+  if (!item || !box) return false;
+  isFollowPlayerMode.value = false;
+  const pad = Math.max(box.maxX - box.minX, box.maxY - box.minY) * 0.15 + 40;
+  const rect = item.imageToViewportRectangle(
+    box.minX - pad,
+    box.minY - pad,
+    box.maxX - box.minX + 2 * pad,
+    box.maxY - box.minY + 2 * pad,
+  );
+  viewer.viewport.fitBounds(rect, true);
+  viewer.viewport.applyConstraints(true);
+  syncOverlayTransform();
+  return true;
+}
+
+function applyPendingFocus(): void {
+  const req = mapFocusRequest.value;
+  if (req && req.worldspace === currentMapWorldspace.value && focusWorldPoint(req.x, req.y)) {
+    mapFocusRequest.value = null;
+    return;
+  }
+  const sessionId = journeyLayers.focusSessionId;
+  if (sessionId !== null && pendingSessionFit) {
+    // The path loads asynchronously; retry briefly until it is there.
+    if (fitSession(sessionId)) pendingSessionFit = false;
+    else setTimeout(applyPendingFocus, 250);
+  }
+}
+
+let pendingSessionFit = journeyLayers.focusSessionId !== null;
+
+const journeyStore = useJourneyStore();
+const focusSession = computed(() =>
+  journeyLayers.focusSessionId === null
+    ? null
+    : (journeyStore.sessions.find((s) => s.id === journeyLayers.focusSessionId) ?? null),
+);
+const focusSessionLabel = computed(() => {
+  const s = focusSession.value;
+  if (!s) return '';
+  return s.title || new Date(s.startedAt).toLocaleDateString(i18n.global.locale.value, { month: 'short', day: 'numeric' });
+});
+
 async function setupViewer(): Promise<void> {
   const host = osdContainerRef.value;
   if (!host) return;
@@ -351,7 +513,7 @@ async function setupViewer(): Promise<void> {
     visibilityRatio: 1.0,
     constrainDuringPan: true,
     minZoomImageRatio: 3,
-    maxZoomPixelRatio: MAX_ZOOM_FACTOR,
+    maxZoomPixelRatio: MAX_ZOOM_PIXEL_RATIO,
     animationTime: 0.3,
     springStiffness: 1,
     // false = OSD keeps the previous LOD visible until the next one is fully
@@ -435,14 +597,17 @@ async function setupViewer(): Promise<void> {
     }
 
     syncContainerSize();
+    allowZoomOutToFit();
     applyHomeBounds();
     attachSharedTileCache(item);
     centerOnPlayer(true);
+    applyPendingFocus();
   });
 
   viewer.addHandler('update-viewport', syncOverlayTransform);
   viewer.addHandler('resize', () => {
     syncContainerSize();
+    allowZoomOutToFit();
     syncOverlayTransform();
     centerOnPlayer(true);
   });
@@ -500,6 +665,15 @@ onMounted(() => {
 watch(displayPosition, () => {
   centerOnPlayer(true);
 });
+
+watch(mapFocusRequest, () => applyPendingFocus());
+watch(
+  () => journeyLayers.focusSessionId,
+  (id) => {
+    pendingSessionFit = id !== null;
+    applyPendingFocus();
+  },
+);
 
 /**
  * When the player crosses a worldspace boundary, destroy the current
@@ -625,6 +799,87 @@ onBeforeUnmount(() => {
 
   &:active {
     transform: scale(0.96);
+  }
+}
+
+.map-layer-controls,
+.map-zoom-controls {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.map-layer-controls {
+  top: calc(var(--spacing-md) + env(safe-area-inset-top));
+  right: calc(var(--spacing-md) + env(safe-area-inset-right));
+}
+
+.map-zoom-controls {
+  bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom));
+  left: calc(var(--spacing-md) + env(safe-area-inset-left));
+}
+
+.map-ctrl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  background-color: rgb(16 16 16 / 82%);
+  border: var(--border-thin) solid var(--skyrim-border-medium);
+  border-radius: 999px;
+  box-shadow: var(--shadow-medium);
+  color: var(--skyrim-text-primary);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+
+  &.is-active {
+    border-color: var(--skyrim-border-accent);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.map-focus-chip {
+  position: absolute;
+  top: calc(var(--spacing-md) + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 60%;
+  padding: 4px 4px 4px 12px;
+  background: rgb(16 16 16 / 85%);
+  border: var(--border-thin) solid #f3c45e;
+  border-radius: 999px;
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xs);
+  color: #f3c45e;
+  transform: translateX(-50%);
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  button {
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--skyrim-text-primary);
+    font-size: 1rem;
+    cursor: pointer;
   }
 }
 

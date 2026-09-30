@@ -52,7 +52,11 @@
         }
       },
       "map": {
-        "label": "Map"
+        "label": "Map",
+        "subtabs": {
+          "view": "Map",
+          "journal": "Journal"
+        }
       }
     },
     "content": {
@@ -94,7 +98,16 @@
         "prefetchProgress": "Rendering… {count} left",
         "prefetchDone": "Done: {count} items checked."
       },
-      "updateDll": "Update SkyrimWebSocket.dll to use this feature"
+      "updateDll": "Update SkyrimWebSocket.dll to use this feature",
+      "journey": {
+        "title": "Hero's journey",
+        "record": "Record path and session log",
+        "objectives": "Log completed objectives",
+        "hint": "Records while the app is connected: one position per second, stored on this device.",
+        "storage": "{sessions} sessions, {notes} notes, about {size} used on this device",
+        "deleteAll": "Delete all journal data",
+        "confirmDeleteAll": "Tap again to delete everything"
+      }
     }
   },
   "pages": {
@@ -273,6 +286,93 @@
       "prefetch": {
         "label": "Loading map",
         "progress": "{progress}%"
+      },
+      "tab": "Map"
+    },
+    "journal": {
+      "tab": "Journal",
+      "newNote": "New note",
+      "editNote": "Edit note",
+      "notePlaceholder": "What happened here?",
+      "removePhoto": "Remove photo",
+      "addPhoto": "Photo",
+      "gameScreenshot": "Game screenshot",
+      "capturing": "Capturing…",
+      "inside": "Inside {place}",
+      "pinned": "Pinned on the map",
+      "pinHere": "Pinned where you stand",
+      "noPin": "No map position",
+      "noPinShort": "no pin",
+      "photoFailed": "This photo could not be read.",
+      "screenshotFailed": "Screenshot failed: {reason}",
+      "noteLimit": "Note limit reached ({max}). Delete or export old notes first.",
+      "showOnMap": "Show on map",
+      "confirmDelete": "Tap again to delete",
+      "layerPath": "Hero's path",
+      "layerNotes": "Notes",
+      "clearFocus": "Show all sessions",
+      "recording": "live",
+      "noSessions": "No sessions yet. Play with the app connected to start your journal.",
+      "back": "Back",
+      "titlePlaceholder": "Name this session",
+      "levelOnly": "Level {level}",
+      "levelRange": "Level {from} → {to}",
+      "export": "Export",
+      "exportAll": "Export all",
+      "exportNotes": "Export notes",
+      "exportFailed": "Export failed: {reason}",
+      "savedTo": "Saved: {location}",
+      "share": "Share",
+      "noEvents": "Nothing logged yet.",
+      "event": {
+        "note": "Note: {text}",
+        "level": "Reached level {level}",
+        "objective": "{objective} ({quest})",
+        "quest": "Quest completed: {quest}",
+        "location": "Entered {place}"
+      },
+      "searchNotes": "Search notes",
+      "noMatches": "No matching notes.",
+      "noNotes": "No notes yet. Tap the quill on the home map to add one.",
+      "photoNote": "Photo",
+      "tabs": {
+        "sessions": "Sessions",
+        "notes": "Notes",
+        "shots": "Screenshots"
+      },
+      "shots": {
+        "intro": "Test: the plugin asks the game for a screenshot (like PrintScreen), then the app downloads a smaller copy.",
+        "needPlugin": "This needs the updated SkyrimWebSocket plugin (feature \"screenshots\").",
+        "take": "Take screenshot",
+        "refresh": "Refresh list",
+        "saveAsNote": "Save as note here",
+        "folder": "Folder: {folder} ({total} files)",
+        "none": "No screenshot files found yet.",
+        "failed": "Failed: {reason}",
+        "waiting": "Waiting for the game to write the file…",
+        "ok": "Screenshot received.",
+        "saved": "Saved as a note."
+      },
+      "md": {
+        "level": "Reached level {level}",
+        "objective": "Objective done: *{quest}*: {objective}",
+        "quest": "Quest completed: **{quest}**",
+        "entered": "Entered {place}",
+        "note": "Note: {text}",
+        "photo": "Photo",
+        "played": "Played {time}",
+        "walked": "Travelled {distance}",
+        "levelOnly": "Level {level}",
+        "levelRange": "Level {from} → {to}",
+        "timeline": "Timeline",
+        "notes": "Notes",
+        "allNotes": "All notes",
+        "journalTitle": "Skyrim journal",
+        "totals": "{sessions} sessions · {time} played · {distance} travelled",
+        "colSession": "Session",
+        "colPlayed": "Played",
+        "colWalked": "Travelled",
+        "colEvents": "Events"
       }
     }
   },
@@ -376,7 +476,10 @@
     "removeFromFavorites": "Remove from Favorites",
     "dropItem": "Drop Item",
     "weight": "Weight",
-    "value": "Value"
+    "value": "Value",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete"
   },
   "entities": {
     "spell": {

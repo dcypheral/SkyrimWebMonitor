@@ -21,7 +21,8 @@ export const useNavigationStore = defineStore('navigation', () => {
       { id: 'questsList', label: t('pages.quests.questsList.tab') },
     ],
     map: [
-      { id: 'view', label: '' },
+      { id: 'view', label: t('pages.map.tab') },
+      { id: 'journal', label: t('pages.journal.tab') },
     ],
   });
 
@@ -69,7 +70,7 @@ export const useNavigationStore = defineStore('navigation', () => {
       : []),
   ]);
 
-  const subTabsToHide = ['favorites', 'soulgems', 'ammo', 'view', 'overview'];
+  const subTabsToHide = ['favorites', 'soulgems', 'ammo', 'overview'];
 
   const activeTab = ref<string>('home');
   const activeSubTab = ref<string>('overview');

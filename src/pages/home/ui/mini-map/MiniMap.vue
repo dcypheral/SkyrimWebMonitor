@@ -38,6 +38,35 @@
         aria-hidden="true"
       >
         <g
+          v-if="pathLayer"
+          class="minimap__journey"
+          :transform="pathTransform"
+        >
+          <path
+            v-if="pathLayer.faded"
+            class="minimap__trail minimap__trail--faded"
+            :d="pathLayer.faded"
+          />
+          <path
+            v-if="pathLayer.highlight"
+            class="minimap__trail"
+            :d="pathLayer.highlight"
+          />
+        </g>
+        <g
+          v-for="pin in notePins"
+          :key="pin.id"
+          class="minimap__note"
+          :transform="`translate(${pin.x} ${pin.y})`"
+        >
+          <path d="M0 0 L-5 -8 A6 6 0 1 1 5 -8 Z" />
+          <circle
+            cx="0"
+            cy="-11"
+            r="2.2"
+          />
+        </g>
+        <g
           v-for="marker in questMarkers"
           :key="marker.key"
           :transform="`translate(${marker.x} ${marker.y})`"
@@ -91,6 +120,19 @@
     >{{ t('pages.home.mapInterior', { place: placeName }) }}</span>
 
     <button
+      type="button"
+      class="minimap__add-note"
+      :aria-label="t('pages.journal.newNote')"
+      @click="noteActions.openNewNote()"
+    >
+      <base-icon
+        icon-path="lorc/quill-ink.svg"
+        :size="17"
+        background-color="var(--skyrim-text-primary)"
+      />
+    </button>
+
+    <button
       v-if="hasView"
       type="button"
       class="minimap__zoom"
@@ -115,6 +157,11 @@ import {
   type DziInfo,
 } from '@/pages/map';
 import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
+import { BaseIcon } from '@/shared/ui';
+import { journeyLayers } from '@/shared/lib/settings/journeyLayers';
+import { pickLod } from '@/stores/journey/lib/simplify';
+import { useJourneyStore } from '@/stores/journey/useJourneyStore';
+import { useJourneyPath, useNoteActions } from '@/features/journey';
 import { useMapHotspotsStore } from '@/stores/map/useMapHotspotsStore';
 import { levelGeometry, maxDziLevel, placeInView, visibleTiles } from '../../lib/minimapTiles';
 
@@ -246,6 +293,71 @@ const questMarkers = computed(() => {
       offscreen: placed.offscreen,
       bearingDeg: (placed.bearing * 180) / Math.PI,
     });
+  }
+  return out;
+});
+
+// ─── Hero's path and notes ──────────────────────────────────────────────
+
+const journey = useJourneyStore();
+const noteActions = useNoteActions();
+const journeyWorldspace = computed<string | null>(() => mapConfig.value.worldspace);
+const projectFn = computed(() => projection.value.projectWorldToImage);
+const journeyPath = useJourneyPath(journeyWorldspace, projectFn);
+
+/** Image → view transform; the path itself stays in image pixels. */
+const pathTransform = computed(() => {
+  const c = center.value;
+  if (!c) return '';
+  const k = ZOOM_STEPS[zoomIndex.value];
+  return `translate(${viewWidth.value / 2} ${viewHeight.value / 2}) scale(${1 / k}) translate(${-c.x} ${-c.y})`;
+});
+
+/**
+ * Culling rectangle snapped to a coarse grid, so the path data is rebuilt
+ * only when the player moves a quarter screen, not on every position tick.
+ */
+const cullRect = computed(() => {
+  const c = center.value;
+  if (!c) return null;
+  const k = ZOOM_STEPS[zoomIndex.value];
+  const halfW = viewWidth.value * k;
+  const halfH = viewHeight.value * k;
+  const grid = Math.max(halfW, halfH) / 2 || 1;
+  const gx = Math.round(c.x / grid) * grid;
+  const gy = Math.round(c.y / grid) * grid;
+  return { minX: gx - halfW, minY: gy - halfH, maxX: gx + halfW, maxY: gy + halfH };
+});
+
+const cullKey = computed(() => {
+  const r = cullRect.value;
+  return r ? `${r.minX}|${r.minY}|${zoomIndex.value}` : '';
+});
+
+const pathLayer = computed(() => {
+  if (!journeyLayers.path || !cullKey.value) return null;
+  const data = journeyPath.pathData(pickLod(ZOOM_STEPS[zoomIndex.value]), {
+    highlightSession: journey.activeSessionId,
+    onlyHighlight: !journeyLayers.allSessions,
+    rect: cullRect.value,
+  });
+  return data.highlight || data.faded ? data : null;
+});
+
+const notePins = computed(() => {
+  const c = center.value;
+  if (!journeyLayers.notes || !c) return [];
+  const k = ZOOM_STEPS[zoomIndex.value];
+  const ws = mapConfig.value.worldspace;
+  const out: Array<{ id: number; x: number; y: number }> = [];
+  for (const note of journey.notes) {
+    if (note.worldspace !== ws) continue;
+    const p = projection.value.projectWorldToImage({ x: note.x, y: note.y });
+    if (!p) continue;
+    const x = (p.x - c.x) / k + viewWidth.value / 2;
+    const y = (p.y - c.y) / k + viewHeight.value / 2;
+    if (x < -8 || y < -8 || x > viewWidth.value + 8 || y > viewHeight.value + 20) continue;
+    out.push({ id: note.id, x, y });
   }
   return out;
 });
@@ -413,6 +525,57 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   font-size: var(--font-size-sm);
   color: var(--skyrim-text-dim);
   text-align: center;
+}
+
+.minimap__journey {
+  pointer-events: none;
+}
+
+.minimap__trail {
+  fill: none;
+  stroke: #f0c060;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 90%));
+
+  &--faded {
+    stroke: #c9a15a;
+    stroke-width: 1.6;
+    opacity: 0.55;
+  }
+}
+
+.minimap__note {
+  path {
+    fill: #f2e6c4;
+    stroke: #2a2112;
+    stroke-width: 1.2;
+  }
+
+  circle {
+    fill: #2a2112;
+  }
+}
+
+.minimap__add-note {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: rgb(0 0 0 / 55%);
+  border: var(--border-thin) solid var(--skyrim-border-medium);
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .minimap__zoom {

@@ -3,6 +3,7 @@
     <theme-gamut-picker />
     <gfx-icons-settings />
     <item-thumbnails-settings />
+    <journey-settings />
     <gfx-fonts-settings />
     <display-controls :teleport="false" />
   </div>
@@ -14,4 +15,5 @@ import ThemeGamutPicker from '../theme-gamut-picker/ThemeGamutPicker.vue';
 import GfxIconsSettings from '../gfx-icons-settings/GfxIconsSettings.vue';
 import ItemThumbnailsSettings from '../item-thumbnails-settings/ItemThumbnailsSettings.vue';
 import GfxFontsSettings from '../gfx-fonts-settings/GfxFontsSettings.vue';
+import JourneySettings from '../journey-settings/JourneySettings.vue';
 </script>

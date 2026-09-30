@@ -27,6 +27,7 @@ import {
   TheShouts,
   TheQuests,
   TheMap,
+  TheJournal,
 } from '@/pages';
 
 const INVENTORY_FREQUENCY = 200; // ms
@@ -384,6 +385,11 @@ export const pagesRegistry: PagesRegistry = {
   },
 
   map: {
+    journal: {
+      // Journey data comes from the always-on journey subscriptions.
+      component: TheJournal,
+      subscriptions: [],
+    },
     view: {
       component: TheMap,
       subscriptions: [

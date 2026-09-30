@@ -13,7 +13,9 @@ import {
   getTabCategorySubscription,
   TAB_CATEGORY_SUBSCRIPTIONS,
 } from '@/app/config/pageRegistry';
-import { GLOBAL_SUBSCRIPTIONS } from '@/app/config/globalSubscriptions';
+import { GLOBAL_SUBSCRIPTIONS, JOURNEY_SUBSCRIPTIONS } from '@/app/config/globalSubscriptions';
+import { journeyRecordingEnabled } from '@/shared/lib/settings/journeyPreference';
+import { useJourneyStore } from '@/stores/journey/useJourneyStore';
 import { DataRouter } from '@/stores/adapters/dataRouter';
 import { prefetchMapTiles, getMapConfig } from '@/pages/map';
 import { logger } from '@/shared/lib/utils/logger';
@@ -54,6 +56,21 @@ export function useAppLoader() {
     });
   };
 
+  const journeyStore = useJourneyStore();
+
+  const startJourneySubscriptions = (): void => {
+    if (!journeyRecordingEnabled.value) return;
+    void journeyStore.load();
+    Object.values(JOURNEY_SUBSCRIPTIONS).forEach((cfg) => {
+      startSubscription(cfg.subscriptionId, cfg.fields, cfg.settings?.frequency, cfg.settings?.sendOnChange);
+    });
+  };
+
+  const stopJourneySubscriptions = (): void => {
+    Object.values(JOURNEY_SUBSCRIPTIONS).forEach((cfg) => stopSubscription(cfg.subscriptionId));
+    void journeyStore.flush();
+  };
+
   const startActivePageSubscription = (): void => {
     const subs = getPageSubscriptions(activeTab.value, activeSubTab.value);
     subs.forEach((s) => {
@@ -77,9 +94,13 @@ export function useAppLoader() {
 
     startCategorySubscription(activeTab.value);
     startActivePageSubscription();
+    startJourneySubscriptions();
   };
 
   onMounted(async () => {
+    // Journal and map notes work offline too.
+    void journeyStore.load();
+
     // Kick off DZI tile prefetch in the background BEFORE awaiting the
     // websocket connection. `connect()` can take a while (or hang while the
     // game is not running), and we don't want that to delay map readiness.
@@ -146,6 +167,13 @@ export function useAppLoader() {
     logger.log('Player is in-game (canAct=true) — loading initial data');
     loadInitialDataAndStartActiveSubs();
   }, { once: true});
+
+  // Recording can be switched on and off in the settings.
+  watch(journeyRecordingEnabled, (enabled) => {
+    if (!isConnected.value || !canAct.value) return;
+    if (enabled) startJourneySubscriptions();
+    else stopJourneySubscriptions();
+  });
 
   // Keep the WebSocket command gate in sync with `canAct`. While actions are
   // unavailable the app stays fully navigable (tabs, item browsing) and keeps

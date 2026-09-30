@@ -7,6 +7,7 @@ import { useGameStatusStore } from '@/stores/game/useGameStatusStore';
 import { useMapHotspotsStore } from '@/stores/map/useMapHotspotsStore';
 import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
 import { useQuestStore } from '@/stores/quests/useQuestStore';
+import { useJourneyStore } from '@/stores/journey/useJourneyStore';
 import type { RouterResult } from './lib/types';
 import { isCharacterStatsData, isWeaponsData, isApparelData, isFoodData, isPotionsData, isScrollsData, isKeysData, isBooksData, isInventoryCategories, isIngredientsData, isMiscData, isMagicCategoriesData, isDestructionData, isAlterationData, isConjurationData, isIllusionData, isRestorationData, isEnchantingData, isShoutsData, isHotkeyItemsData, isQuestsData, isGameStatusData, isMapHotspotsData, isMapQuestMarkersData, isPlayerPositionData } from './typeGuards';
 import { logger } from '@/shared/lib/utils/logger';
@@ -16,6 +17,15 @@ export class DataRouter {
     const characterStore = useCharacterStore();
     const inventoryStore = useInventoryStore();
     try {
+      if (subscriptionId.startsWith('journey.')) {
+        useJourneyStore().ingest(subscriptionId, data);
+        // Keep the player position fresh on every page (notes pin to it).
+        if (subscriptionId === 'journey.position' && isPlayerPositionData(data, 'map.player')) {
+          useMapPlayerStore().setPosition(data.position);
+        }
+        return { success: true, message: 'Data routed to journey store' };
+      }
+
       if (isCharacterStatsData(data, subscriptionId)) {
         logger.log('[DataRouter] Routing character stats to character store');
         characterStore.setStats(data);

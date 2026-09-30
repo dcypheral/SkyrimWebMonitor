@@ -24,3 +24,6 @@ export { default as TheQuests } from './quests/the-quests/TheQuests.vue';
 
 // Map page
 export { TheMap } from './map';
+
+// Journal (hero's journey)
+export { default as TheJournal } from './journal/the-journal/TheJournal.vue';
