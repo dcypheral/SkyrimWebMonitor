@@ -244,6 +244,43 @@ function handleActionClick(actionEvent: string) {
   gap: var(--spacing-md);
 }
 
+/*
+ * Narrow screens (handheld lower screen): stack list → compact preview →
+ * toolbar instead of the side-by-side split, so names are not truncated.
+ */
+@media (width <= 560px) {
+  .inventory-list {
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .list-wrapper {
+    display: contents;
+  }
+
+  .list {
+    order: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .item-preview {
+    order: 2;
+    flex: 0 0 auto;
+    max-height: 40%;
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--skyrim-border-dark);
+
+    &:empty {
+      display: none;
+    }
+  }
+
+  .inventory-toolbar {
+    order: 3;
+  }
+}
+
 .toolbar-btn {
   --skyrim-text-accent: var(--skyrim-text-secondary);
 

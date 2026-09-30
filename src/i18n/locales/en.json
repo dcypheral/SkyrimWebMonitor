@@ -2,9 +2,16 @@
   "app": {
     "navigation": {
       "mainAriaLabel": "Main navigation",
-      "subAriaLabel": "Sub navigation"
+      "subAriaLabel": "Sub navigation",
+      "dock": {
+        "items": "Items",
+        "stats": "Stats"
+      }
     },
     "tabs": {
+      "home": {
+        "label": "Home"
+      },
       "character": {
         "label": "Character",
         "subtabs": {
@@ -87,6 +94,31 @@
     }
   },
   "pages": {
+    "home": {
+      "questTitle": "Current objective",
+      "noQuest": "No active quest",
+      "noQuestHint": "Track a quest in your journal to see it here.",
+      "notTracked": "Not tracked",
+      "questCounter": "{index} / {total}",
+      "prevQuest": "Previous quest",
+      "nextQuest": "Next quest",
+      "shout": "Shout",
+      "noShout": "No shout",
+      "shoutPickerTitle": "Choose a shout",
+      "noShouts": "No shouts learned yet.",
+      "wordsKnown": "{known} of {total} words",
+      "hotkeyEmpty": "Empty",
+      "hotkeySlot": "Hotkey {slot}",
+      "hotkeyUse": "Use",
+      "hotkeyClear": "Clear slot",
+      "hotkeyAssignHint": "Assign items and spells to this slot from the Items and Magic lists.",
+      "mapInterior": "Inside {place}",
+      "mapNoArea": "No map for this area",
+      "mapZoomIn": "Zoom in",
+      "mapZoomOut": "Zoom out",
+      "mapOpen": "Open the world map",
+      "north": "N"
+    },
     "character": {
       "stats": {
         "tab": "Stats",

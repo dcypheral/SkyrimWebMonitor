@@ -113,8 +113,8 @@ defineProps<{
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   margin-left: var(--spacing-sm);
 
   + .inv-info {

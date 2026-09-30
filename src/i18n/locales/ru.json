@@ -2,9 +2,16 @@
   "app": {
     "navigation": {
       "mainAriaLabel": "Главная навигация",
-      "subAriaLabel": "Вспомогательная навигация"
+      "subAriaLabel": "Вспомогательная навигация",
+      "dock": {
+        "items": "Предметы",
+        "stats": "Персонаж"
+      }
     },
     "tabs": {
+      "home": {
+        "label": "Главная"
+      },
       "character": {
         "label": "Персонаж",
         "subtabs": {
@@ -87,6 +94,31 @@
     }
   },
   "pages": {
+    "home": {
+      "questTitle": "Текущая цель",
+      "noQuest": "Нет активного задания",
+      "noQuestHint": "Отслеживайте задание в журнале, чтобы видеть его здесь.",
+      "notTracked": "Не отслеживается",
+      "questCounter": "{index} / {total}",
+      "prevQuest": "Предыдущее задание",
+      "nextQuest": "Следующее задание",
+      "shout": "Крик",
+      "noShout": "Нет крика",
+      "shoutPickerTitle": "Выберите крик",
+      "noShouts": "Крики ещё не изучены.",
+      "wordsKnown": "Слов изучено: {known} из {total}",
+      "hotkeyEmpty": "Пусто",
+      "hotkeySlot": "Слот {slot}",
+      "hotkeyUse": "Использовать",
+      "hotkeyClear": "Очистить слот",
+      "hotkeyAssignHint": "Назначайте предметы и заклинания в этот слот из списков предметов и магии.",
+      "mapInterior": "Внутри: {place}",
+      "mapNoArea": "Для этой местности нет карты",
+      "mapZoomIn": "Приблизить",
+      "mapZoomOut": "Отдалить",
+      "mapOpen": "Открыть карту мира",
+      "north": "С"
+    },
     "character": {
       "stats": {
         "tab": "Характеристики",

@@ -152,4 +152,48 @@ const displayName = computed(() => {
     }
   }
 }
+
+/* Compact card on narrow screens: thumbnail left, name + stats right. */
+@media (width <= 560px) {
+  .base-preview.base-preview {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      'icon info'
+      'effect effect';
+    gap: var(--spacing-xs) var(--spacing-md);
+    align-items: center;
+  }
+
+  .base-preview > :first-child {
+    grid-area: icon;
+  }
+
+  .base-preview :deep(.item-thumbnail) {
+    width: 72px;
+    height: 72px;
+  }
+
+  .base-preview .info {
+    grid-area: info;
+
+    .name {
+      font-size: var(--font-size-base);
+      margin-bottom: 2px;
+    }
+
+    .stats.stats {
+      flex-flow: row wrap;
+      gap: 0 var(--spacing-md);
+    }
+
+    .stat {
+      font-size: var(--font-size-sm);
+    }
+  }
+
+  .base-preview .enchantment {
+    grid-area: effect;
+  }
+}
 </style>

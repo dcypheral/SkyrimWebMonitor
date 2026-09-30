@@ -1,3 +1,6 @@
+// Home page
+export { TheHome } from './home';
+
 // Character pages
 export { default as TheStats } from './character/the-stats/TheStats.vue';
 export { default as TheHotkeys } from './character/the-hotkeys/TheHotkeys.vue';

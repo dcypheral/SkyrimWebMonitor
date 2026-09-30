@@ -148,7 +148,7 @@ function loadDziInfoFromStorage(): DziInfo | null {
   }
 }
 
-async function loadDziInfo(dziUrl: string): Promise<DziInfo | null> {
+export async function loadDziInfo(dziUrl: string): Promise<DziInfo | null> {
   try {
     const res = await fetch(dziUrl, { cache: 'force-cache' });
     if (!res.ok) {

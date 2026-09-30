@@ -42,19 +42,21 @@ describe('useNavigationStore', () => {
   });
 
   describe('initial state', () => {
-    it('activeTab is character', () => {
+    it('activeTab is home', () => {
       const store = useNavigationStore();
-      expect(store.activeTab).toBe('character');
+      expect(store.activeTab).toBe('home');
     });
 
-    it('activeSubTab is stats', () => {
+    it('activeSubTab is the hidden home overview', () => {
       const store = useNavigationStore();
-      expect(store.activeSubTab).toBe('stats');
+      expect(store.activeSubTab).toBe('overview');
+      expect(store.getVisibleSubTabs()).toEqual([]);
     });
 
-    it('tabs includes character, inventory, magic', () => {
+    it('tabs start with home, then character, inventory, magic', () => {
       const store = useNavigationStore();
       const tabIds = store.tabs.map((t) => t.id);
+      expect(tabIds[0]).toBe('home');
       expect(tabIds).toContain('character');
       expect(tabIds).toContain('inventory');
       expect(tabIds).toContain('magic');
@@ -87,7 +89,7 @@ describe('useNavigationStore', () => {
     it('ignores unknown tab', () => {
       const store = useNavigationStore();
       store.setActiveTab('nonexistent');
-      expect(store.activeTab).toBe('character');
+      expect(store.activeTab).toBe('home');
     });
   });
 
@@ -100,6 +102,7 @@ describe('useNavigationStore', () => {
 
     it('sets transitionDirection based on position change', () => {
       const store = useNavigationStore();
+      store.setActiveTab('character');
       // character tab has subTabs: stats (idx 0), hotkeys (idx 1)
       store.setActiveSubTab('hotkeys'); // from stats(0) to hotkeys(1) = left
       expect(store.transitionDirection).toBe('left');
@@ -109,6 +112,7 @@ describe('useNavigationStore', () => {
   describe('nextSubTab', () => {
     it('switches to next subtab within same tab', () => {
       const store = useNavigationStore();
+      store.setActiveTab('character');
       // character: ['stats', 'hotkeys'] — stats at idx 0
       store.nextSubTab(); // stats -> hotkeys
       expect(store.activeSubTab).toBe('hotkeys');
@@ -119,6 +123,7 @@ describe('useNavigationStore', () => {
   describe('prevSubTab', () => {
     it('switches to previous subtab within same tab', () => {
       const store = useNavigationStore();
+      store.setActiveTab('character');
       store.setActiveSubTab('hotkeys');
       store.prevSubTab(); // hotkeys -> stats
       expect(store.activeSubTab).toBe('stats');
@@ -152,6 +157,7 @@ describe('useNavigationStore', () => {
   describe('lastSubTabMap (remembering last subtab)', () => {
     it('remembers last subtab and restores it when switching back', () => {
       const store = useNavigationStore();
+      store.setActiveTab('character');
       // Stay on character, switch to hotkeys
       store.setActiveSubTab('hotkeys');
       // Switch to inventory

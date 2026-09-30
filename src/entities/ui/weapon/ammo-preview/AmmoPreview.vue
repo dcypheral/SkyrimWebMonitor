@@ -9,7 +9,7 @@
         fallback-icon-path="lorc/arrow-cluster.svg"
         :model-path="data.modelPath"
         :keywords="data.keywords"
-        :size="96"
+        :size="128"
         framing="diagonal"
       />
     </template>

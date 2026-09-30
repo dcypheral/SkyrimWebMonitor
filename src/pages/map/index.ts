@@ -1,6 +1,7 @@
 export { default as TheMap } from './the-map/TheMap.vue';
 export {
   prefetchMapTiles,
+  loadDziInfo,
   mapTileBlobUrls,
   mapTilesPrefetchActive,
   mapTilesPrefetchProgress,
@@ -13,6 +14,7 @@ export type {
   MapProjectionFn,
   ProjectedPoint,
   UseMapProjection,
+  DziInfo,
 } from './lib/types';
 export {
   DEFAULT_MARKER_ICON,

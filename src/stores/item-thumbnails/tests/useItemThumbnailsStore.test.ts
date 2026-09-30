@@ -44,7 +44,7 @@ describe('useItemThumbnailsStore', () => {
   }
 
   it('builds a key from model, material and framing', () => {
-    expect(thumbnailKey(DAGGER)).toBe('v1|meshes/weapons/steel/steeldagger.nif|steel|diagonal');
+    expect(thumbnailKey(DAGGER)).toBe('v2|meshes/weapons/steel/steeldagger.nif|steel|diagonal');
     expect(thumbnailKey({ ...DAGGER, modelPath: null })).toBeNull();
   });
 

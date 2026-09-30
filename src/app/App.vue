@@ -12,6 +12,8 @@
           :sub-tab="activeSubTab"
         />
       </main>
+
+      <skyrim-dock />
     </template>
 
     <connection-status v-else />
@@ -24,7 +26,7 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { SkyrimNavigation, SkyrimContent } from '@/app/ui';
+import { SkyrimNavigation, SkyrimContent, SkyrimDock } from '@/app/ui';
 import {
   ConnectionStatus,
   SkyrimModal,

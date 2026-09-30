@@ -1,24 +1,33 @@
 <template>
   <header class="navigation-header">
-    <div class="tab-bar-row">
+    <div class="header-row">
       <nav
-        ref="tabsRef"
-        class="tab-bar"
+        v-if="visibleSubTabs.length > 0"
+        ref="subtabsRef"
+        class="subtab-bar header-subtabs animate-fade-in"
         role="tablist"
-        :aria-label="$t('app.navigation.mainAriaLabel')"
+        :aria-label="$t('app.navigation.subAriaLabel')"
       >
         <button
-          v-for="tab in nav.tabs"
-          :key="tab.id"
-          class="tab"
-          :class="{ active: nav.activeTab === tab.id }"
+          v-for="sub in visibleSubTabs"
+          :key="sub.id"
+          class="subtab"
+          :class="{ active: nav.activeSubTab === sub.id }"
           role="tab"
-          :aria-selected="nav.activeTab === tab.id"
-          @click="nav.setActiveTab(tab.id)"
+          :aria-selected="nav.activeSubTab === sub.id"
+          @click="nav.setActiveSubTab(sub.id)"
         >
-          {{ tab.label }}
+          {{
+            getSubtabLabel(sub)
+          }}
         </button>
       </nav>
+      <h1
+        v-else
+        class="header-title"
+      >
+        {{ activeTabLabel }}
+      </h1>
 
       <button
         type="button"
@@ -26,34 +35,12 @@
         :aria-label="$t('app.settings.open')"
         @click="openSettings"
       >
-        <base-icon 
+        <base-icon
           icon-path="lorc/cog.svg"
           :background-color="'var(--skyrim-text-secondary)'"
         />
       </button>
     </div>
-
-    <nav
-      v-if="visibleSubTabs.length > 0"
-      ref="subtabsRef"
-      class="subtab-bar animate-fade-in"
-      role="tablist"
-      :aria-label="$t('app.navigation.subAriaLabel')"
-    >
-      <button
-        v-for="sub in visibleSubTabs"
-        :key="sub.id"
-        class="subtab"
-        :class="{ active: nav.activeSubTab === sub.id }"
-        role="tab"
-        :aria-selected="nav.activeSubTab === sub.id"
-        @click="nav.setActiveSubTab(sub.id)"
-      >
-        {{
-          getSubtabLabel(sub)
-        }}
-      </button>
-    </nav>
   </header>
 </template>
 
@@ -66,13 +53,13 @@ import { SettingsModalContent } from '@/features/settings';
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
 import type { SubTab } from '@/stores/use-navigation-store/lib/types';
 
-const tabsRef = ref<HTMLElement | null>(null);
 const subtabsRef = ref<HTMLElement | null>(null);
 const nav = useNavigationStore();
 const { t } = useI18n();
 const { openModal } = useModal();
 
 const visibleSubTabs = computed(() => nav.getVisibleSubTabs());
+const activeTabLabel = computed(() => nav.tabs.find((tab) => tab.id === nav.activeTab)?.label ?? '');
 
 // Center the active item in the horizontally scrollable container.
 // If items fit, CSS `justify-content: safe center` centers them and
@@ -107,7 +94,6 @@ watch(
   () => nav.activeTab,
   async () => {
     await nextTick();
-    centerActive(tabsRef.value, '.tab.active');
     if (subtabsRef.value) {
       subtabsRef.value.scrollLeft = 0;
     }
@@ -125,9 +111,8 @@ watch(
 
 <style scoped lang="scss">
 /*
- * Tab and subtab styles come from the design system:
- *   .tab-bar, .tab, .subtab-bar, .subtab (components/tabs.scss).
- * Only the header wrapper (sticky positioning) is component-specific.
+ * Top bar: sub-tabs of the current section (or its title) + settings.
+ * Main sections live in the bottom dock (SkyrimDock), within thumb reach.
  */
 
 .navigation-header {
@@ -137,15 +122,16 @@ watch(
   z-index: var(--z-sticky);
 }
 
-.tab-bar-row {
+.header-row {
   display: flex;
   align-items: stretch;
+  min-height: 40px;
   background-color: var(--skyrim-bg-dark);
-  border-bottom: 2px solid var(--skyrim-border-dark);
+  border-bottom: 1px solid var(--skyrim-border-dark);
   box-sizing: border-box;
 }
 
-.tab-bar {
+.header-subtabs {
   flex: 1 1 auto;
   min-width: 0;
   justify-content: flex-start;
@@ -155,12 +141,26 @@ watch(
   border-bottom: none;
 }
 
-.tab-bar > .tab:first-child {
+.header-subtabs > .subtab:first-child {
   margin-left: auto;
 }
 
-.tab-bar > .tab:last-child {
+.header-subtabs > .subtab:last-child {
   margin-right: auto;
+}
+
+.header-title {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding-inline: max(var(--spacing-md), env(safe-area-inset-left));
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--skyrim-text-secondary);
 }
 
 .settings-button {
@@ -168,6 +168,7 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px;
   padding-inline: var(--spacing-sm)
     max(var(--spacing-sm), env(safe-area-inset-right));
   background-color: transparent;
@@ -187,19 +188,5 @@ watch(
     background-color: var(--tab-bg-active);
     transition: none;
   }
-}
-
-.subtab-bar {
-  justify-content: flex-start;
-  padding-inline: var(--spacing-sm);
-  scroll-padding-inline: var(--spacing-sm);
-}
-
-.subtab-bar > .subtab:first-child {
-  margin-left: auto;
-}
-
-.subtab-bar > .subtab:last-child {
-  margin-right: auto;
 }
 </style>

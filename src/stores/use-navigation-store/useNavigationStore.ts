@@ -10,6 +10,7 @@ export const useNavigationStore = defineStore('navigation', () => {
   const systemStore = useSystemStore();
 
   const subTabsMap = ref<Record<string, SubTab[]>>({
+    home: [{ id: 'overview', label: '' }],
     character: [
       { id: 'stats', label: t('pages.character.stats.tab') },
       { id: 'hotkeys', label: t('pages.character.hotkeys.tab') },
@@ -25,6 +26,11 @@ export const useNavigationStore = defineStore('navigation', () => {
   });
 
   const tabs = computed<Tab[]>(() => [
+    {
+      id: 'home',
+      label: t('app.tabs.home.label'),
+      subTabs: subTabsMap.value.home,
+    },
     {
       id: 'character',
       label: t('app.tabs.character.label'),
@@ -63,10 +69,10 @@ export const useNavigationStore = defineStore('navigation', () => {
       : []),
   ]);
 
-  const subTabsToHide = ['favorites', 'soulgems', 'ammo', 'view'];
+  const subTabsToHide = ['favorites', 'soulgems', 'ammo', 'view', 'overview'];
 
-  const activeTab = ref<string>('character');
-  const activeSubTab = ref<string>('stats');
+  const activeTab = ref<string>('home');
+  const activeSubTab = ref<string>('overview');
   const transitionDirection = ref<'left' | 'right' | ''>('');
 
   // Remembers the last active sub-tab per main tab so that returning

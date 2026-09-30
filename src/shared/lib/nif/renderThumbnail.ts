@@ -77,9 +77,10 @@ void main() {
   vec3 halfVec = normalize(keyDir + toCamera);
   float spec = pow(max(dot(n, halfVec), 0.0), 32.0);
 
-  vec3 color = base.rgb * (0.28 + 0.95 * key * vec3(1.0, 0.96, 0.88) + 0.35 * fill * vec3(0.75, 0.85, 1.0));
-  color += spec * 0.35 * vec3(1.0, 0.97, 0.9);
-  color += rim * 0.45 * vec3(0.85, 0.9, 1.0);
+  // Matte look: game textures already carry their own shading detail.
+  vec3 color = base.rgb * (0.38 + 0.8 * key * vec3(1.0, 0.96, 0.9) + 0.25 * fill * vec3(0.8, 0.88, 1.0));
+  color += spec * 0.08 * vec3(1.0, 0.97, 0.9);
+  color += rim * 0.14 * vec3(0.85, 0.9, 1.0);
   gl_FragColor = vec4(min(color, vec3(1.0)), 1.0);
 }
 `;
@@ -137,7 +138,7 @@ export function renderNifThumbnail(model: NifModel, options: ThumbnailOptions = 
   const width = bounds.max[0] - bounds.min[0];
   const height = bounds.max[2] - bounds.min[2];
   const depth = Math.max(bounds.max[1] - bounds.min[1], 1e-3);
-  const extent = Math.max(width, height, 1e-3) * 1.12; // padding
+  const extent = Math.max(width, height, 1e-3) * 1.04; // small padding: fill the box
   const scale = 2 / extent;
   const centerX = (bounds.min[0] + bounds.max[0]) / 2;
   const centerZ = (bounds.min[2] + bounds.max[2]) / 2;
@@ -360,27 +361,46 @@ function mul(a: Mat3, b: Mat3): Mat3 {
 /** Tilt for flat apparel (radians about the view x axis). */
 const FLAT_ITEM_TILT = 0.85;
 
-/** Slight turn and tilt so flat framings still show depth. */
+/** Slight turn and tilt (view space) so flat framings still show depth. */
 const PRESENTATION = mul(rotX(-0.18), rotZ(0.3));
 
-/** BSInvMarker euler angles: Z first, then Y, then X (matches vanilla framings). */
+/**
+ * Skyrim's inventory camera looks at the model from +Y with Z up. This
+ * renderer looks from -Y, so a half turn about Z converts between the two.
+ * Actors face +Y, so worn items (helmets, cuirasses) show their front.
+ */
+const FROM_POSITIVE_Y = rotZ(Math.PI);
+
+/**
+ * BSInvMarker angles are clockwise when seen from the positive axis
+ * (negative right-handed angles), applied Z first, then Y, then X.
+ * Source: Beyond Skyrim wiki, "Nifskope Weapons Setup".
+ */
 function invMarkerRotation(x: number, y: number, z: number): Mat3 {
-  return mul(PRESENTATION, mul(rotX(x), mul(rotY(y), rotZ(z))));
+  return mul(PRESENTATION, mul(FROM_POSITIVE_Y, mul(rotX(-x), mul(rotY(-y), rotZ(-z)))));
 }
 
 /**
- * No BSInvMarker: point the thinnest bounding-box axis at the camera and lay
- * the longest one along the screen diagonal (weapons) or upright (apparel).
+ * No BSInvMarker. Weapons: thinnest bounding-box axis toward the camera,
+ * longest along the diagonal with the tip (the end farthest from the grip at
+ * the origin) to the top right. Apparel: Z up, front toward the camera.
  */
 function heuristicRotation(meshes: NifMesh[], framing: ThumbnailFraming): Mat3 {
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
+  let tip: [number, number, number] = [0, 0, 0];
+  let tipDistance = -1;
   for (const mesh of meshes) {
     const p = mesh.positions;
     for (let i = 0; i < p.length; i += 3) {
       for (let axis = 0; axis < 3; axis++) {
         if (p[i + axis] < min[axis]) min[axis] = p[i + axis];
         if (p[i + axis] > max[axis]) max[axis] = p[i + axis];
+      }
+      const d = p[i] * p[i] + p[i + 1] * p[i + 1] + p[i + 2] * p[i + 2];
+      if (d > tipDistance) {
+        tipDistance = d;
+        tip = [p[i], p[i + 1], p[i + 2]];
       }
     }
   }
@@ -390,33 +410,34 @@ function heuristicRotation(meshes: NifMesh[], framing: ThumbnailFraming): Mat3 {
   const middle = order[1];
   const thinnest = order[2];
 
-  // Build a basis: view x (right) = middle, view y (depth) = thinnest, view z (up) = longest.
+  if (framing === 'upright') {
+    // Flat apparel lying in the XY plane (rings, circlets, amulets): seen from
+    // the front and above so the band reads as a 3D loop.
+    if (thinnest === 2) return mul(rotX(FLAT_ITEM_TILT), FROM_POSITIVE_Y);
+    return mul(PRESENTATION, FROM_POSITIVE_Y);
+  }
+
+  // View basis: x (right) = middle, y (depth) = thinnest, z (up) = longest.
   const basis: Mat3 = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   basis[0 * 3 + middle] = 1;
   basis[1 * 3 + thinnest] = 1;
   basis[2 * 3 + longest] = 1;
-  // Keep it a proper rotation (det = +1).
-  if (det3(basis) < 0) basis[0 * 3 + middle] = -1;
+  if (det3(basis) < 0) basis[0 * 3 + middle] = -1; // keep a proper rotation
 
-  if (framing === 'upright') {
-    // Flat apparel lying in the XY plane (rings, circlets, amulets): look at
-    // it from the front and above so the band reads as a 3D loop.
-    if (thinnest === 2) {
-      return mul(PRESENTATION, rotX(FLAT_ITEM_TILT));
-    }
-    // Apparel authored standing (Z up) stays upright, seen from the front.
-    if (extents[2] >= extents[thinnest]) {
-      const front: Mat3 = [0, 0, 0, 0, 0, 0, 0, 0, 1];
-      const side = thinnest === 0 ? 1 : 0;
-      front[0 * 3 + side] = 1;
-      front[1 * 3 + thinnest] = 1;
-      if (det3(front) < 0) front[0 * 3 + side] = -1;
-      return mul(PRESENTATION, front);
-    }
-    return mul(PRESENTATION, basis);
-  }
-  // Diagonal: rotate the longest axis 45° in the screen plane (tip to the top right).
-  return mul(PRESENTATION, mul(rotY(-Math.PI / 4), basis));
+  let m = mul(rotY(-Math.PI / 4), basis);
+  const t = applyMat(m, tip);
+  if (t[2] < 0) m = mul(rotY(Math.PI), m); // tip down → half turn in the screen plane
+  const t2 = applyMat(m, tip);
+  if (t2[0] < 0) m = mul(rotZ(Math.PI), m); // tip left → turn around the vertical
+  return mul(PRESENTATION, m);
+}
+
+function applyMat(m: Mat3, v: [number, number, number]): [number, number, number] {
+  return [
+    m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+    m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+    m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+  ];
 }
 
 function det3(m: Mat3): number {

@@ -6,6 +6,7 @@ import type {
   PageSubscriptionConfig,
 } from './types';
 import {
+  TheHome,
   TheStats,
   TheHotkeys,
   TheWeapons,
@@ -33,6 +34,52 @@ const INVENTORY_FREQUENCY = 200; // ms
 export type { PageConfig, PagesRegistry, CategorySubscriptionConfig } from './types';
 
 export const pagesRegistry: PagesRegistry = {
+  home: {
+    overview: {
+      component: TheHome,
+      // Same subscription ids as the dedicated pages, so the data lands in
+      // the same stores through the DataRouter.
+      subscriptions: [
+        {
+          id: 'character.stats',
+          fields: {
+            health: 'ActorValue::kHealth',
+            magicka: 'ActorValue::kMagicka',
+            stamina: 'ActorValue::kStamina',
+            healthBase: 'ActorValue::kHealth::Base',
+            magickaBase: 'ActorValue::kMagicka::Base',
+            staminaBase: 'ActorValue::kStamina::Base',
+          },
+          settings: { frequency: 100 },
+        },
+        {
+          id: 'hotkeys.items',
+          fields: { items: 'Hotkey::Items' },
+          settings: { frequency: INVENTORY_FREQUENCY },
+        },
+        {
+          id: 'magic.shouts',
+          fields: { items: 'Magic::Items::Shouts' },
+          settings: { frequency: 1000 },
+        },
+        {
+          id: 'quests.questsList',
+          fields: { quests: 'Player::Quests' },
+          settings: { frequency: 1000 },
+        },
+        {
+          id: 'map.player',
+          fields: { position: 'Player::Position' },
+          settings: { frequency: 100 },
+        },
+        {
+          id: 'map.questMarkers',
+          fields: { marker: 'Map::Markers::Quests' },
+          settings: { frequency: 1000 },
+        },
+      ],
+    },
+  },
   character: {
     stats: {
       component: TheStats,

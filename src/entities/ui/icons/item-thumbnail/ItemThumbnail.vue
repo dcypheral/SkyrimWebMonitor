@@ -98,6 +98,12 @@ watch(source, requestIfVisible);
   width: var(--thumb-size);
   height: var(--thumb-size);
 
+  // Fallback icon scales with the box (the box can be resized by the parent).
+  :deep(.base-icon) {
+    width: 75%;
+    height: 75%;
+  }
+
   &__image {
     width: 100%;
     height: 100%;
