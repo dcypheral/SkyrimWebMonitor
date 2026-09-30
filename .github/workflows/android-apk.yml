@@ -56,7 +56,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p public
-          gh release download map-assets \
+          gh release download map-assets --repo andreyvelsk/SkyrimWebMonitor \
             --pattern 'map-dzi.tar.gz' \
             --output map-dzi.tar.gz
           tar -xzf map-dzi.tar.gz -C public
