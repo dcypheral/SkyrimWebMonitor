@@ -165,6 +165,8 @@ function eventText(e: SessionEvent): string {
       return t('pages.journal.event.quest', { quest: e.text });
     case 'location':
       return t('pages.journal.event.location', { place: e.text });
+    case 'discovery':
+      return t('pages.journal.event.discovery', { place: e.text });
     default:
       return e.text;
   }
@@ -283,6 +285,11 @@ function eventText(e: SessionEvent): string {
 
   .timeline__item--note & {
     background: #f2e6c4;
+  }
+
+  .timeline__item--discovery & {
+    background: transparent;
+    border: 2px solid #e8d9a8;
   }
 }
 

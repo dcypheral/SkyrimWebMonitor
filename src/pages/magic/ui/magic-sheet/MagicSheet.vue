@@ -186,6 +186,7 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>();
   }
 
   :deep(.btn.is-on) {
+    background-color: color-mix(in srgb, var(--sheet-color) 18%, var(--skyrim-bg-dark));
     border-color: var(--sheet-color);
     color: var(--sheet-color);
   }

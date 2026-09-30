@@ -115,6 +115,14 @@ export const useJourneyStore = defineStore('journey', () => {
     return loadPromise;
   }
 
+  /** Re-reads sessions and notes after a restore. */
+  async function reload(): Promise<void> {
+    loadPromise = null;
+    for (const id of photoUrls.keys()) revokePhoto(id);
+    await load();
+    pathVersion.value++;
+  }
+
   // ─── Sessions ──────────────────────────────────────────────────────────
 
   function ensureSession(now: number): JourneySession {
@@ -186,6 +194,13 @@ export const useJourneyStore = defineStore('journey', () => {
     if (!journeyRecordingEnabled.value || !isLoaded.value || !isRecord(data)) return;
     if (subscriptionId === 'journey.position') ingestPosition(data.position);
     else if (subscriptionId === 'journey.progress') ingestProgress(data);
+    else if (subscriptionId === 'journey.discoveries') ingestDiscoveries(data.discoveries);
+  }
+
+  function ingestDiscoveries(raw: unknown): void {
+    const now = Date.now();
+    const session = ensureSession(now);
+    pushEvents(session, tracker.updateDiscoveries(raw, now));
   }
 
   function ingestPosition(raw: unknown): void {
@@ -197,9 +212,10 @@ export const useJourneyStore = defineStore('journey', () => {
     // Log interiors the player enters (once per visit).
     const cell = raw.isInterior ? raw.cell : null;
     if (cell && cell !== lastCell) {
+      const label = raw.cellName?.trim() || cell;
       const recent = lastEventOfKind(session.events, 'location');
-      if (!recent || recent.text !== cell || now - recent.t > 10 * 60_000) {
-        pushEvents(session, [{ t: now, kind: 'location', text: cell }]);
+      if (!recent || recent.text !== label || now - recent.t > 10 * 60_000) {
+        pushEvents(session, [{ t: now, kind: 'location', text: label }]);
       }
     }
     lastCell = cell;
@@ -423,6 +439,7 @@ export const useJourneyStore = defineStore('journey', () => {
     liveSegment,
     canAddNote,
     load,
+    reload,
     ingest,
     flush,
     addNote,

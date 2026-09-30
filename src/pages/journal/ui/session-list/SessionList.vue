@@ -42,6 +42,13 @@
           <span v-if="countEvents(s, 'objective')">
             ✓ {{ countEvents(s, 'objective') }}
           </span>
+          <span v-if="countEvents(s, 'discovery')">
+            <base-icon
+              icon-path="lorc/compass.svg"
+              :size="12"
+            />
+            {{ countEvents(s, 'discovery') }}
+          </span>
           <span v-if="countEvents(s, 'note')">
             <base-icon
               icon-path="lorc/quill-ink.svg"

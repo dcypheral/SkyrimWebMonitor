@@ -19,15 +19,19 @@ export interface JourneySample {
   cell: string | null;
 }
 
-export type SessionEventKind = 'level' | 'objective' | 'quest' | 'location' | 'note';
+export type SessionEventKind = 'level' | 'objective' | 'quest' | 'location' | 'discovery' | 'note';
 
 export interface SessionEvent {
   /** ms since epoch */
   t: number;
   kind: SessionEventKind;
   text: string;
-  /** Extra context, e.g. quest name for an objective, note id for a note. */
+  /** Extra context, e.g. quest name for an objective, note id for a note, marker type for a discovery. */
   detail?: string;
+  /** Map position (discoveries): worldspace and world units. */
+  worldspace?: string;
+  x?: number;
+  y?: number;
 }
 
 export interface JourneySession {

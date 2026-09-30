@@ -20,3 +20,21 @@ describe('zip', () => {
     expect(view.getUint32(centralOffset, true)).toBe(0x02014b50);
   });
 });
+
+describe('readZip', () => {
+  it('reads back what createZip writes', async () => {
+    const { readZip } = await import('../zip');
+    const zip = createZip([
+      { name: 'a.md', data: '# hi' },
+      { name: 'photos/b.bin', data: new Uint8Array([1, 2, 3]) },
+    ]);
+    const files = await readZip(zip);
+    expect(new TextDecoder().decode(files.get('a.md'))).toBe('# hi');
+    expect(Array.from(files.get('photos/b.bin') ?? [])).toEqual([1, 2, 3]);
+  });
+
+  it('rejects other files', async () => {
+    const { readZip } = await import('../zip');
+    await expect(readZip(new Uint8Array(40))).rejects.toThrow('not a zip file');
+  });
+});

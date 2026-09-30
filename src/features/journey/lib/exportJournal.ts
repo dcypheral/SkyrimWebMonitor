@@ -4,10 +4,12 @@
  *  - One session: `<date>.md`, or a `.zip` with the photos when it has any.
  *  - Notes only: `notes.md` (or `.zip` with photos).
  *  - Everything: `skyrim-journal-<date>.zip` with README.md, notes.md,
- *    sessions/*.md and photos/*.
+ *    sessions/*.md, photos/* and backup/journey.json. The same zip restores
+ *    through `importBackup` (see stores/journey/lib/backup.ts).
  */
 import { i18n } from '@/i18n';
 import { createZip, type ZipEntry } from '@/shared/lib/utils/zip';
+import { BACKUP_JSON_PATH, buildBackup } from '@/stores/journey/lib/backup';
 import { saveFile, type SavedFile } from '@/shared/lib/utils/saveFile';
 import { extensionForMime } from '@/shared/lib/utils/imageFile';
 import { journeyDb } from '@/stores/journey/lib/journeyDb';
@@ -74,7 +76,10 @@ export async function exportAll(sessions: readonly JourneySession[], notes: read
   const { files, names } = await collectPhotos(notes);
   const rootCtx = context(names, 'photos/');
   const sessionCtx = context(names, '../photos/');
+  const photoPaths = new Map(Array.from(names, ([id, name]) => [id, `photos/${name}`] as const));
+  const backup = buildBackup(sessions, notes, await journeyDb.listChunks(), photoPaths);
   const entries: ZipEntry[] = [
+    { name: BACKUP_JSON_PATH, data: JSON.stringify(backup) },
     { name: 'README.md', data: indexMarkdown(sessions, rootCtx) },
     { name: 'notes.md', data: notesToMarkdown(notes, rootCtx) },
     ...sessions.map((s) => ({ name: `sessions/${sessionFileName(s)}`, data: sessionToMarkdown(s, notes, sessionCtx) })),

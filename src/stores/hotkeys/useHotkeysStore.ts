@@ -6,12 +6,40 @@ import {
   NATIVE_HOTKEY_COUNT,
   TOTAL_HOTKEY_COUNT,
   isNativeHotkeySlot,
+  supportsHandChoice,
   type HotkeyBinding,
+  type HotkeyHand,
   type HotkeyItemsState,
   type HotkeySlotEntry,
 } from './lib/types';
 
 const EXTRA_STORAGE_KEY = 'skyrim-monitor-extra-hotkeys';
+const HANDS_STORAGE_KEY = 'skyrim-monitor-hotkey-hands';
+
+/** Hand choice per slot, remembered with the form it was made for. */
+type HandMap = Record<number, { formId: string; hand: HotkeyHand }>;
+
+function isHand(v: unknown): v is HotkeyHand {
+  return v === 'left' || v === 'right' || v === 'both';
+}
+
+function loadHands(): HandMap {
+  const out: HandMap = {};
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(HANDS_STORAGE_KEY) ?? '{}');
+    if (typeof parsed !== 'object' || parsed === null) return out;
+    for (const [key, value] of Object.entries(parsed)) {
+      const slot = Number(key);
+      if (typeof value !== 'object' || value === null) continue;
+      const formId: unknown = Reflect.get(value, 'formId');
+      const hand: unknown = Reflect.get(value, 'hand');
+      if (Number.isInteger(slot) && typeof formId === 'string' && isHand(hand)) out[slot] = { formId, hand };
+    }
+  } catch {
+    /* corrupt or unavailable storage */
+  }
+  return out;
+}
 
 const range = (from: number, to: number): number[] => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 const EMPTY_SLOTS: HotkeySlotEntry[] = range(1, NATIVE_HOTKEY_COUNT).map((slot) => ({ slot, bound: false }));
@@ -42,6 +70,22 @@ function loadExtra(): HotkeySlotEntry[] {
   return range(NATIVE_HOTKEY_COUNT + 1, TOTAL_HOTKEY_COUNT).map(
     (slot) => stored.find((e) => e.slot === slot) ?? { slot, bound: false },
   );
+}
+
+/**
+ * Commands for a hotkey used from the app with a hand choice. A native slot
+ * then equips directly too, since the game's own hotkey has no hand option.
+ * "both" sends one command per hand (a weapon needs two copies for that).
+ */
+export function triggerCommands(entry: HotkeySlotEntry, hand: HotkeyHand | null): SendCommandOptions[] {
+  if (!entry.bound) return [];
+  if (hand && supportsHandChoice(entry)) {
+    const command = entry.kind === 'spell' ? 'equip_spell' : 'equip';
+    const hands: Array<'left' | 'right'> = hand === 'both' ? ['left', 'right'] : [hand];
+    return hands.map((h) => ({ command, formId: entry.formId, hand: h }));
+  }
+  const single = triggerCommand(entry);
+  return single ? [single] : [];
 }
 
 /**
@@ -153,9 +197,35 @@ export const useHotkeysStore = defineStore('hotkeys', () => {
     else bind(slot, binding);
   }
 
+  // ─── Hand choice (long-press menu on Home) ─────────────────────────────
+  const hands = ref<HandMap>(loadHands());
+
+  /** Hand chosen for this slot's current form, or null (game default). */
+  function handFor(entry: HotkeySlotEntry): HotkeyHand | null {
+    if (!entry.bound) return null;
+    const saved = hands.value[entry.slot];
+    return saved && saved.formId === entry.formId ? saved.hand : null;
+  }
+
+  /** Left/right toggles: both on = both hands, both off = default. */
+  function setHands(entry: HotkeySlotEntry, left: boolean, right: boolean): void {
+    if (!entry.bound) return;
+    const next: HandMap = { ...hands.value };
+    if (left && right) next[entry.slot] = { formId: entry.formId, hand: 'both' };
+    else if (left) next[entry.slot] = { formId: entry.formId, hand: 'left' };
+    else if (right) next[entry.slot] = { formId: entry.formId, hand: 'right' };
+    else delete next[entry.slot];
+    hands.value = next;
+    try {
+      localStorage.setItem(HANDS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+
   function trigger(entry: HotkeySlotEntry): void {
-    const command = triggerCommand(entry);
-    if (command) useWebSocketStore().sendCommand(command);
+    const ws = useWebSocketStore();
+    for (const command of triggerCommands(entry, handFor(entry))) ws.sendCommand(command);
   }
 
   return {
@@ -169,5 +239,8 @@ export const useHotkeysStore = defineStore('hotkeys', () => {
     unbind,
     toggle,
     trigger,
+    hands,
+    handFor,
+    setHands,
   };
 });

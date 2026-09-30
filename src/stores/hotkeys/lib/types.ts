@@ -54,6 +54,18 @@ export type HotkeySlotEntry = HotkeySlotUnbound | HotkeySlotSpell | HotkeySlotIt
 /** What a binding needs to remember (slot and bound flag are added on bind). */
 export type HotkeyBinding = Omit<HotkeySlotSpell, 'slot' | 'bound'> | Omit<HotkeySlotItem, 'slot' | 'bound'>;
 
+/** Hand choice for a hotkey used from the app. */
+export type HotkeyHand = 'left' | 'right' | 'both';
+
+const ONE_HANDED = new Set(['OneHandSword', 'OneHandDagger', 'OneHandAxe', 'OneHandMace', 'Staff']);
+
+/** Spells and one-handed weapons can go in either hand. */
+export function supportsHandChoice(entry: HotkeySlotEntry): boolean {
+  if (!entry.bound) return false;
+  if (entry.kind === 'spell') return entry.spellType === 'Spell';
+  return entry.categoryType === 'Weapon' && !!entry.weaponType && ONE_HANDED.has(entry.weaponType);
+}
+
 export interface HotkeyItemsState {
   items?: HotkeySlotEntry[] | null;
 }

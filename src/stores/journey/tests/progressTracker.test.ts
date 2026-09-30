@@ -37,3 +37,17 @@ describe('ProgressTracker', () => {
     expect(t.updateLevel(30, 3)).toEqual([]);
   });
 });
+
+describe('ProgressTracker discoveries', () => {
+  it('uses the first snapshot as a baseline and logs later discoveries once', () => {
+    const tracker = new ProgressTracker();
+    const d = (seq: number, name: string) => ({ seq, name, type: 'Cave', worldspace: 'Tamriel', x: 10.4, y: 20.6 });
+    expect(tracker.updateDiscoveries({ seq: 1, recent: [d(1, 'Old')] }, 1)).toEqual([]);
+    const events = tracker.updateDiscoveries({ seq: 3, recent: [d(1, 'Old'), d(2, 'Bleak Falls Barrow'), d(3, 'Riverwood')] }, 2);
+    expect(events.map((e) => e.text)).toEqual(['Bleak Falls Barrow', 'Riverwood']);
+    expect(events[0]).toMatchObject({ kind: 'discovery', detail: 'Cave', worldspace: 'Tamriel', x: 10, y: 21 });
+    expect(tracker.updateDiscoveries({ seq: 3, recent: [d(3, 'Riverwood')] }, 3)).toEqual([]);
+    // Game restarted: counter went back, new baseline.
+    expect(tracker.updateDiscoveries({ seq: 1, recent: [d(1, 'Whiterun')] }, 4)).toEqual([]);
+  });
+});

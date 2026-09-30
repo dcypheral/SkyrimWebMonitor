@@ -240,6 +240,13 @@ export interface MapQuestMarker {
   x: number;
   y: number;
   z: number;
+  /** Raw target position in its own cell/worldspace (local map). */
+  localX?: number | null;
+  localY?: number | null;
+  localZ?: number | null;
+  localCellFormId?: string | null;
+  localWorldspaceFormId?: string | null;
+  localIsInterior?: boolean;
 }
 
 /** `Map::Markers::Quests` payload shape (after field unwrapping). */
@@ -277,6 +284,8 @@ export interface PlayerPosition {
   z: number;
   angle: number;
   cell: string | null;
+  /** Display name of the cell (newer plugins); `cell` is the editor ID. */
+  cellName?: string | null;
   cellFormId: string | null;
   isInterior: boolean;
   worldspace: string | null;

@@ -13,6 +13,7 @@ import type {
   ScreenshotTakeResultData,
   ScreenshotListResultData,
   ScreenshotGetResultData,
+  LocalMapResultData,
 } from '@/api/websocket';
 import { DataRouter } from '@/stores/adapters/dataRouter';
 import type { Subscription } from './lib/types';
@@ -40,6 +41,21 @@ function isScreenshotListResult(data: unknown): data is ScreenshotListResultData
 
 function isScreenshotGetResult(data: unknown): data is ScreenshotGetResultData {
   return typeof data === 'object' && data !== null && 'dataBase64' in data && typeof data.dataBase64 === 'string';
+}
+
+function isLocalMapResult(data: unknown): data is LocalMapResultData {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    'vertices' in data &&
+    typeof data.vertices === 'string' &&
+    'triangles' in data &&
+    typeof data.triangles === 'string'
+  );
+}
+
+function isAnyResult(_data: unknown): _data is unknown {
+  return true;
 }
 
 export const useWebSocketStore = defineStore('websocket', () => {
@@ -272,6 +288,13 @@ export const useWebSocketStore = defineStore('websocket', () => {
       isScreenshotGetResult,
     );
 
+  /** Navmesh floor plan around the player (feature "map.local"). */
+  const getLocalMap = (): Promise<LocalMapResultData> =>
+    runBackgroundCommand({ command: 'local_map_get' }, isLocalMapResult);
+
+  /** Clears the plugin's Debug::FieldTimings counters. */
+  const resetPerfStats = (): Promise<unknown> => runBackgroundCommand({ command: 'perf_reset' }, isAnyResult);
+
   const connect = async (): Promise<void> => {
     const requestId = ++connectionRequestId;
 
@@ -431,6 +454,8 @@ export const useWebSocketStore = defineStore('websocket', () => {
     takeScreenshot,
     listScreenshots,
     getScreenshot,
+    getLocalMap,
+    resetPerfStats,
     setCommandsEnabled,
     $dispose: cleanup,
   };

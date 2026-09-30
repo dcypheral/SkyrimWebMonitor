@@ -72,6 +72,8 @@ export function eventLine(e: SessionEvent, ctx: MarkdownContext): string {
       return `- ${at} — ${ctx.t('journal.md.quest', { quest: text })}`;
     case 'location':
       return `- ${at} — ${ctx.t('journal.md.entered', { place: text })}`;
+    case 'discovery':
+      return `- ${at} — ${ctx.t('journal.md.discovered', { place: text })}`;
     case 'note':
       return `- ${at} — ${ctx.t('journal.md.note', { text })}`;
   }

@@ -88,6 +88,24 @@ export const journeyDb = {
       await Promise.all([tx.objectStore('notes').delete(noteId), tx.objectStore('photos').delete(noteId), tx.done]);
     }),
 
+  listChunks: () => safe('listChunks', NO_CHUNKS, (db) => db.getAll('chunks')),
+
+  /** Writes restored data in one transaction (all or nothing). */
+  importData: async (data: {
+    sessions: readonly JourneySession[];
+    chunks: readonly PathChunk[];
+    notes: readonly JourneyNote[];
+    photos: readonly NotePhoto[];
+  }): Promise<void> => {
+    const db = await getDb();
+    const tx = db.transaction(['sessions', 'chunks', 'notes', 'photos'], 'readwrite');
+    for (const s of data.sessions) void tx.objectStore('sessions').put(s);
+    for (const c of data.chunks) void tx.objectStore('chunks').put(c);
+    for (const n of data.notes) void tx.objectStore('notes').put(n);
+    for (const p of data.photos) void tx.objectStore('photos').put(p);
+    await tx.done;
+  },
+
   /** Removes everything (sessions, paths, notes, photos). */
   clearAll: () =>
     safe('clearAll', undefined, async (db) => {

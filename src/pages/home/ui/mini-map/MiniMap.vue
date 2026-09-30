@@ -2,7 +2,7 @@
   <div
     ref="root"
     class="minimap"
-    :class="{ 'minimap--pinned': isPinned, 'minimap--empty': !hasView }"
+    :class="{ 'minimap--pinned': isPinned && !showLocal, 'minimap--empty': !hasView && !showLocal, 'minimap--local': showLocal }"
   >
     <button
       type="button"
@@ -10,8 +10,16 @@
       :aria-label="t('pages.home.mapOpen')"
       @click="emit('open')"
     >
+      <local-map-canvas
+        v-if="showLocal && localGeometry && localCenter"
+        :geometry="localGeometry"
+        :center="localCenter"
+        :units-per-px="LOCAL_ZOOM_STEPS[zoomIndex]"
+        :width="viewWidth"
+        :height="viewHeight"
+      />
       <div
-        v-if="hasView"
+        v-else-if="hasView"
         class="minimap__tiles"
         :style="tilesStyle"
       >
@@ -32,13 +40,13 @@
       </div>
 
       <svg
-        v-if="hasView"
+        v-if="hasView || showLocal"
         class="minimap__overlay"
         :viewBox="`0 0 ${viewWidth} ${viewHeight}`"
         aria-hidden="true"
       >
         <g
-          v-if="pathLayer"
+          v-if="pathLayer && !showLocal"
           class="minimap__journey"
           :transform="pathTransform"
         >
@@ -54,7 +62,7 @@
           />
         </g>
         <g
-          v-for="pin in notePins"
+          v-for="pin in showLocal ? [] : notePins"
           :key="pin.id"
           class="minimap__note"
           :transform="`translate(${pin.x} ${pin.y})`"
@@ -67,7 +75,7 @@
           />
         </g>
         <g
-          v-for="marker in questMarkers"
+          v-for="marker in showLocal ? localQuestMarkers : questMarkers"
           :key="marker.key"
           :transform="`translate(${marker.x} ${marker.y})`"
         >
@@ -104,7 +112,7 @@
       </svg>
 
       <span
-        v-if="!hasView"
+        v-if="!hasView && !showLocal"
         class="minimap__message"
       >{{ t('pages.home.mapNoArea') }}</span>
     </button>
@@ -115,9 +123,24 @@
     >{{ t('pages.home.north') }}</span>
 
     <span
-      v-if="isPinned && placeName"
+      v-if="showLocal && localGeometry?.name"
+      class="minimap__place"
+    >{{ localGeometry.name }}</span>
+    <span
+      v-else-if="isPinned && placeName"
       class="minimap__place"
     >{{ t('pages.home.mapInterior', { place: placeName }) }}</span>
+
+    <button
+      v-if="localApplies"
+      type="button"
+      class="minimap__mode"
+      :aria-pressed="homeMapMode === 'auto'"
+      :aria-label="showLocal ? t('pages.home.mapShowWorld') : t('pages.home.mapShowLocal')"
+      @click="toggleMode"
+    >
+      {{ showLocal ? t('pages.home.mapLocal') : t('pages.home.mapWorld') }}
+    </button>
 
     <button
       type="button"
@@ -133,7 +156,7 @@
     </button>
 
     <button
-      v-if="hasView"
+      v-if="hasView || showLocal"
       type="button"
       class="minimap__zoom"
       :aria-label="zoomIndex === 0 ? t('pages.home.mapZoomOut') : t('pages.home.mapZoomIn')"
@@ -164,6 +187,10 @@ import { useJourneyStore } from '@/stores/journey/useJourneyStore';
 import { useJourneyPath, useNoteActions } from '@/features/journey';
 import { useMapHotspotsStore } from '@/stores/map/useMapHotspotsStore';
 import { levelGeometry, maxDziLevel, placeInView, visibleTiles } from '../../lib/minimapTiles';
+import { homeMapMode, persistHomeMapMode } from '@/shared/lib/settings/homeMapPreference';
+import { localAreaKey } from '@/stores/map/lib/localMap';
+import { useLocalMapStore } from '@/stores/map/useLocalMapStore';
+import LocalMapCanvas from '../local-map/LocalMapCanvas.vue';
 
 const emit = defineEmits<{ open: [] }>();
 const { t } = useI18n();
@@ -171,6 +198,8 @@ const { t } = useI18n();
 /** Full-resolution map pixels per CSS pixel for each zoom step (near, far). */
 const ZOOM_STEPS = [2, 4.5];
 const ZOOM_STORAGE_KEY = 'skyrim-monitor-minimap-zoom';
+/** Local map: world units per CSS pixel for each zoom step (near, far). */
+const LOCAL_ZOOM_STEPS = [5, 11];
 const MARKER_MARGIN = 12;
 
 const root = ref<HTMLElement | null>(null);
@@ -211,7 +240,7 @@ const center = computed(() => {
 });
 
 const isPinned = computed(() => displayPosition.value?.pinned ?? false);
-const placeName = computed(() => position.value?.cell ?? null);
+const placeName = computed(() => position.value?.cellName || position.value?.cell || null);
 const playerAngleDeg = computed(() => ((displayPosition.value?.angle ?? 0) * 180) / Math.PI);
 
 /**
@@ -296,6 +325,71 @@ const questMarkers = computed(() => {
   }
   return out;
 });
+
+// ─── Local map (interiors and cities) ───────────────────────────────────
+
+const localMap = useLocalMapStore();
+const { geometry: localGeometry, loadedKey: localLoadedKey } = storeToRefs(localMap);
+
+/** Inside, or in a city worldspace (Whiterun, Solitude, …). */
+const localApplies = computed(() => {
+  const p = position.value;
+  if (!p || !localMap.isAvailable()) return false;
+  return p.isInterior || (!!p.worldspace && !!p.parentWorldspace && p.worldspace !== p.parentWorldspace);
+});
+
+const wantsLocal = computed(() => homeMapMode.value === 'auto' && localApplies.value);
+
+watch(
+  [wantsLocal, position],
+  ([wanted, p]) => {
+    if (wanted && p) localMap.update(p);
+  },
+  { immediate: true },
+);
+
+/** Show the floor plan only when it belongs to where the player is. */
+const showLocal = computed(() => {
+  const g = localGeometry.value;
+  const p = position.value;
+  if (!wantsLocal.value || !g || !p) return false;
+  if (localLoadedKey.value === localAreaKey(p)) return true;
+  // Outside, the neighbouring cells overlap: keep the old plan while the next loads.
+  return !g.isInterior && !p.isInterior && (localLoadedKey.value ?? '').startsWith(`w:${p.worldspaceFormId ?? ''}:`);
+});
+
+const localCenter = computed(() => {
+  const p = position.value;
+  return p ? { x: p.x, y: p.y, z: p.z } : null;
+});
+
+const localQuestMarkers = computed(() => {
+  const p = position.value;
+  if (!showLocal.value || !p) return [];
+  const k = LOCAL_ZOOM_STEPS[zoomIndex.value];
+  const seen = new Set<string>();
+  const out: Array<{ key: string; x: number; y: number; offscreen: boolean; bearingDeg: number }> = [];
+  for (const m of rawQuestMarkers.value) {
+    const lx = m.localX;
+    const ly = m.localY;
+    if (typeof lx !== 'number' || typeof ly !== 'number') continue;
+    const same = p.isInterior
+      ? m.localCellFormId === p.cellFormId
+      : !m.localIsInterior && m.localWorldspaceFormId === p.worldspaceFormId;
+    if (!same) continue;
+    const key = `${m.questFormId}:${m.refId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    // Screen y grows downwards, world y northwards.
+    const placed = placeInView(lx, -ly, p.x, -p.y, 1 / k, viewWidth.value, viewHeight.value, MARKER_MARGIN);
+    out.push({ key, x: placed.x, y: placed.y, offscreen: placed.offscreen, bearingDeg: (placed.bearing * 180) / Math.PI });
+  }
+  return out;
+});
+
+function toggleMode(): void {
+  persistHomeMapMode(homeMapMode.value === 'auto' ? 'world' : 'auto');
+}
 
 // ─── Hero's path and notes ──────────────────────────────────────────────
 
@@ -576,6 +670,35 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   border-radius: 50%;
   cursor: pointer;
   touch-action: manipulation;
+}
+
+.minimap--local .minimap__player-halo {
+  fill: rgb(0 0 0 / 55%);
+}
+
+.minimap__mode {
+  position: absolute;
+  top: 44px;
+  right: 6px;
+  z-index: 2;
+  min-width: 44px;
+  height: 26px;
+  padding: 0 8px;
+  background: rgb(0 0 0 / 60%);
+  border: var(--border-thin) solid var(--skyrim-border-medium);
+  border-radius: 999px;
+  color: var(--skyrim-text-secondary);
+  font-family: var(--font-heading);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+
+  .minimap--local & {
+    border-color: var(--skyrim-accent-main);
+    color: var(--skyrim-accent-main);
+  }
 }
 
 .minimap__zoom {

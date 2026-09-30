@@ -20,6 +20,8 @@ export {
   type TexturePreviewResultData,
   type ScreenshotTakeResultData,
   type ScreenshotListResultData,
+  type LocalMapResultData,
+  type LocalMapDoor,
   type ScreenshotGetResultData,
   type ScreenshotFileInfo,
   type EquipHand,

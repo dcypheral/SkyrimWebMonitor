@@ -109,3 +109,54 @@ export function createZip(entries: readonly ZipEntry[]): Uint8Array {
   }
   return out;
 }
+
+/**
+ * Reads a ZIP archive into name → bytes. Handles "store" (our own exports)
+ * and "deflate" (the archive was re-packed by another tool). Deflate uses
+ * the browser's DecompressionStream.
+ */
+export async function readZip(bytes: Uint8Array): Promise<Map<string, Uint8Array>> {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // End-of-central-directory record: last 22 bytes plus an optional comment.
+  let end = -1;
+  for (let i = bytes.length - 22; i >= Math.max(0, bytes.length - 22 - 0xffff); i--) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      end = i;
+      break;
+    }
+  }
+  if (end < 0) throw new Error('not a zip file');
+
+  const count = view.getUint16(end + 10, true);
+  let pos = view.getUint32(end + 16, true);
+  const decoder = new TextDecoder();
+  const out = new Map<string, Uint8Array>();
+
+  for (let n = 0; n < count; n++) {
+    if (view.getUint32(pos, true) !== 0x02014b50) throw new Error('bad central directory');
+    const method = view.getUint16(pos + 10, true);
+    const compressedSize = view.getUint32(pos + 20, true);
+    const nameLength = view.getUint16(pos + 28, true);
+    const extraLength = view.getUint16(pos + 30, true);
+    const commentLength = view.getUint16(pos + 32, true);
+    const localOffset = view.getUint32(pos + 42, true);
+    const name = decoder.decode(bytes.subarray(pos + 46, pos + 46 + nameLength));
+    pos += 46 + nameLength + extraLength + commentLength;
+
+    if (name.endsWith('/')) continue;
+    if (view.getUint32(localOffset, true) !== 0x04034b50) throw new Error('bad local header');
+    const dataStart =
+      localOffset + 30 + view.getUint16(localOffset + 26, true) + view.getUint16(localOffset + 28, true);
+    const raw = bytes.subarray(dataStart, dataStart + compressedSize);
+
+    if (method === 0) out.set(name, raw.slice());
+    else if (method === 8) out.set(name, await inflateRaw(raw));
+    else throw new Error(`unsupported zip method ${String(method)}`);
+  }
+  return out;
+}
+
+async function inflateRaw(data: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}

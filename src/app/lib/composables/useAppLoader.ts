@@ -62,6 +62,7 @@ export function useAppLoader() {
     if (!journeyRecordingEnabled.value) return;
     void journeyStore.load();
     Object.values(JOURNEY_SUBSCRIPTIONS).forEach((cfg) => {
+      if (cfg.requiresFeature && !systemStore.isFeatureProvided(cfg.requiresFeature)) return;
       startSubscription(cfg.subscriptionId, cfg.fields, cfg.settings?.frequency, cfg.settings?.sendOnChange);
     });
   };
@@ -167,6 +168,17 @@ export function useAppLoader() {
     logger.log('Player is in-game (canAct=true) — loading initial data');
     loadInitialDataAndStartActiveSubs();
   }, { once: true});
+
+  // Feature-gated journey streams: the feature list can arrive after the
+  // player is already in-game.
+  watch(features, () => {
+    if (!isConnected.value || !canAct.value || !journeyRecordingEnabled.value) return;
+    Object.values(JOURNEY_SUBSCRIPTIONS).forEach((cfg) => {
+      if (cfg.requiresFeature && systemStore.isFeatureProvided(cfg.requiresFeature)) {
+        startSubscription(cfg.subscriptionId, cfg.fields, cfg.settings?.frequency, cfg.settings?.sendOnChange);
+      }
+    });
+  });
 
   // Recording can be switched on and off in the settings.
   watch(journeyRecordingEnabled, (enabled) => {

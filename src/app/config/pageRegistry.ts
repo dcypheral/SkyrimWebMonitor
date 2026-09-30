@@ -83,9 +83,11 @@ export const pagesRegistry: PagesRegistry = {
         { id: 'magic.powers', fields: { items: 'Magic::Items::Powers' }, settings: { frequency: 2000 } },
         { id: 'magic.lesserPowers', fields: { items: 'Magic::Items::LesserPowers' }, settings: { frequency: 2000 } },
         {
+          // Quest text resolving is one of the heavier game-thread reads;
+          // the Home tracker does not need it every second.
           id: 'quests.questsList',
           fields: { quests: 'Player::Quests' },
-          settings: { frequency: 1000 },
+          settings: { frequency: 3000, sendOnChange: true },
         },
         {
           id: 'map.player',
@@ -95,7 +97,7 @@ export const pagesRegistry: PagesRegistry = {
         {
           id: 'map.questMarkers',
           fields: { marker: 'Map::Markers::Quests' },
-          settings: { frequency: 1000 },
+          settings: { frequency: 2000, sendOnChange: true },
         },
       ],
     },

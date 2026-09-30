@@ -11,6 +11,9 @@ export const FEATURES = {
   INVENTORY_MODELS: 'inventory.models',
   SCREENSHOTS: 'screenshots',
   PLAYER_RECORDS: 'player.records',
+  PLAYER_DISCOVERIES: 'player.discoveries',
+  DEBUG_TIMINGS: 'debug.timings',
+  LOCAL_MAP: 'map.local',
 } as const;
 
 export type Feature = (typeof FEATURES)[keyof typeof FEATURES];

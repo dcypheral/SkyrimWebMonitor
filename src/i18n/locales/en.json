@@ -115,6 +115,22 @@
         "title": "Dual screen",
         "toggle": "Keep the controller on the game",
         "hint": "Taps on this app no longer take the controller from the game on the other screen. Text fields pause this: tap a text field once, then again to open the keyboard."
+      },
+      "homeMap": {
+        "title": "Home map",
+        "toggle": "Local map indoors and in cities",
+        "hint": "Shows a floor plan of the area inside dungeons, houses and cities. The Local/World button on the map switches too. Needs the updated plugin."
+      },
+      "perf": {
+        "title": "Game-thread cost",
+        "hint": "Time each data field takes inside the game frame. Fields over 4 ms can cause short hitches. Play a minute, then measure.",
+        "measure": "Measure",
+        "reset": "Reset",
+        "since": "Counting for {seconds} s",
+        "colField": "Field",
+        "colAvg": "avg ms",
+        "colMax": "max ms",
+        "colSlow": ">4 ms"
       }
     }
   },
@@ -159,7 +175,19 @@
       "voice": {
         "shouts": "Shouts",
         "powers": "Powers"
-      }
+      },
+      "hand": {
+        "title": "Hand",
+        "left": "Left",
+        "right": "Right",
+        "hintDefault": "Neither selected: the game decides.",
+        "hintOne": "Used from this screen, it goes to that hand.",
+        "hintBoth": "Used from this screen, it goes to both hands."
+      },
+      "mapLocal": "Local",
+      "mapWorld": "World",
+      "mapShowWorld": "Show the world map",
+      "mapShowLocal": "Show the local map"
     },
     "character": {
       "stats": {
@@ -341,7 +369,8 @@
         "level": "Reached level {level}",
         "objective": "{objective} ({quest})",
         "quest": "Quest completed: {quest}",
-        "location": "Entered {place}"
+        "location": "Entered {place}",
+        "discovery": "Discovered {place}"
       },
       "searchNotes": "Search notes",
       "noMatches": "No matching notes.",
@@ -384,8 +413,14 @@
         "colSession": "Session",
         "colPlayed": "Played",
         "colWalked": "Travelled",
-        "colEvents": "Events"
-      }
+        "colEvents": "Events",
+        "discovered": "Discovered {place}"
+      },
+      "restore": "Restore from backup",
+      "restored": "Restored {sessions} sessions and {notes} notes.",
+      "restoreNothing": "Nothing new in this backup.",
+      "restoreSkipped": "{count} notes skipped (note limit).",
+      "restoreFailed": "Restore failed: {reason}"
     },
     "spellbook": {
       "search": "Search spells or effects",

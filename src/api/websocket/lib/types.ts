@@ -29,7 +29,9 @@ export type CommandType =
   | 'texture_preview'
   | 'screenshot_take'
   | 'screenshot_list'
-  | 'screenshot_get';
+  | 'screenshot_get'
+  | 'local_map_get'
+  | 'perf_reset';
 
 export type EquipHand = EquippedHand;
 
@@ -176,6 +178,39 @@ export interface ScreenshotGetResultData {
   dataBase64: string;
 }
 
+export interface LocalMapDoor {
+  x: number;
+  y: number;
+  z: number;
+  /** Where the door leads. */
+  name: string;
+}
+
+/** local_map_get: navmesh floor plan (see plugin PROTOCOL.md). */
+export interface LocalMapResultData {
+  key: string;
+  isInterior: boolean;
+  name: string;
+  cellFormId: string;
+  worldspace: string | null;
+  minX: number;
+  minY: number;
+  minZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+  vertexCount: number;
+  triangleCount: number;
+  truncated: boolean;
+  /** base64 Int32 LE x,y,z */
+  vertices: string;
+  /** base64 Uint32 LE a,b,c */
+  triangles: string;
+  /** base64 Uint8, open-edge bits per triangle */
+  edges: string;
+  doors: LocalMapDoor[];
+}
+
 export interface CommandResultMessage extends BaseMessage {
   type: 'commandResult';
   id: string;
@@ -186,7 +221,8 @@ export interface CommandResultMessage extends BaseMessage {
     | TexturePreviewResultData
     | ScreenshotTakeResultData
     | ScreenshotListResultData
-    | ScreenshotGetResultData;
+    | ScreenshotGetResultData
+    | LocalMapResultData;
 }
 
 export type ServerMessage =

@@ -47,6 +47,26 @@
         />
         {{ t('pages.journal.exportAll') }}
       </button>
+      <button
+        type="button"
+        class="btn journal__new"
+        :disabled="busy"
+        :aria-label="t('pages.journal.restore')"
+        :title="t('pages.journal.restore')"
+        @click="fileInput?.click()"
+      >
+        <base-icon
+          icon-path="delapouite/open-folder.svg"
+          :size="16"
+        />
+      </button>
+      <input
+        ref="fileInput"
+        type="file"
+        accept=".zip,.json,application/zip,application/json"
+        hidden
+        @change="onRestoreFile"
+      >
     </header>
 
     <div
@@ -113,7 +133,7 @@
       class="journal__toast"
       role="status"
     >
-      <span>{{ saved.error ? t('pages.journal.exportFailed', { reason: saved.error }) : t('pages.journal.savedTo', { location: saved.location }) }}</span>
+      <span>{{ toastText }}</span>
       <button
         v-if="saved.file && canShare"
         type="button"
@@ -133,7 +153,7 @@ import { useI18n } from 'vue-i18n';
 import { BaseIcon } from '@/shared/ui';
 import { canShareFiles, shareFile, type SavedFile } from '@/shared/lib/utils/saveFile';
 import { journeyLayers } from '@/shared/lib/settings/journeyLayers';
-import { exportAll, exportNotes, exportSession, useNoteActions } from '@/features/journey';
+import { exportAll, exportNotes, exportSession, importBackup, useNoteActions } from '@/features/journey';
 import { MAX_NOTES, useJourneyStore } from '@/stores/journey/useJourneyStore';
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
 import { formatDistance, formatDuration } from '../lib/format';
@@ -156,7 +176,40 @@ const detailId = ref<number | null>(null);
 const detail = computed(() => sessions.value.find((s) => s.id === detailId.value) ?? null);
 
 const busy = ref(false);
-const saved = ref<{ location: string; file: SavedFile | null; error: string | null } | null>(null);
+const saved = ref<{ location: string; file: SavedFile | null; error: string | null; message?: string } | null>(null);
+const fileInput = ref<HTMLInputElement | null>(null);
+
+const toastText = computed(() => {
+  const s = saved.value;
+  if (!s) return '';
+  if (s.message) return s.message;
+  return s.error ? t('pages.journal.exportFailed', { reason: s.error }) : t('pages.journal.savedTo', { location: s.location });
+});
+
+async function onRestoreFile(event: Event): Promise<void> {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement)) return;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  busy.value = true;
+  try {
+    const c = await importBackup(file);
+    const message =
+      c.sessionsAdded + c.sessionsUpdated + c.notesAdded + c.notesUpdated === 0
+        ? t('pages.journal.restoreNothing')
+        : t('pages.journal.restored', {
+          sessions: c.sessionsAdded + c.sessionsUpdated,
+          notes: c.notesAdded + c.notesUpdated,
+        }) + (c.notesSkipped ? ` ${t('pages.journal.restoreSkipped', { count: c.notesSkipped })}` : '');
+    showToast({ location: '', file: null, error: null, message });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    showToast({ location: '', file: null, error: reason, message: t('pages.journal.restoreFailed', { reason }) });
+  } finally {
+    busy.value = false;
+  }
+}
 const canShare = canShareFiles();
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 

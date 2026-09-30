@@ -28,6 +28,10 @@
       v-if="count !== null"
       class="slot__count"
     >×{{ count }}</span>
+    <span
+      v-else-if="handLabel"
+      class="slot__count"
+    >{{ handLabel }}</span>
   </button>
 </template>
 
@@ -37,6 +41,7 @@ import { useI18n } from 'vue-i18n';
 import { BaseIcon } from '@/shared/ui';
 import { getHotkeyIconPath } from '@/shared/lib/utils/hotkeyIcons';
 import type { HotkeySlotEntry } from '@/stores/hotkeys/lib/types';
+import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
 import { useLongPress } from '@/shared/lib/composables/useLongPress';
 
 const props = withDefaults(
@@ -63,6 +68,19 @@ const count = computed(() => {
   const e = props.entry;
   if (!e.bound || e.kind !== 'item') return null;
   return e.count > 1 ? e.count : null;
+});
+const hotkeys = useHotkeysStore();
+const handLabel = computed(() => {
+  switch (hotkeys.handFor(props.entry)) {
+    case 'left':
+      return t('pages.spellbook.handShort.left');
+    case 'right':
+      return t('pages.spellbook.handShort.right');
+    case 'both':
+      return t('pages.spellbook.handShort.both');
+    default:
+      return '';
+  }
 });
 const ariaLabel = computed(() => {
   const slot = t('pages.home.hotkeySlot', { slot: props.entry.slot });

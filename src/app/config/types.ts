@@ -1,3 +1,4 @@
+import type { Feature } from '@/stores/system/lib/types';
 import type { Component } from 'vue';
 
 export interface SubscriptionSettings {
@@ -33,6 +34,8 @@ export interface CategorySubscriptionConfig {
 export interface GlobalSubscriptionConfig {
   subscriptionId: string;
   fields: Record<string, string>;
+  /** Only start when the plugin reports this feature. */
+  requiresFeature?: Feature;
   settings?: {
     /** Push interval in milliseconds. Defaults to the WS client's default when omitted. */
     frequency?: number;

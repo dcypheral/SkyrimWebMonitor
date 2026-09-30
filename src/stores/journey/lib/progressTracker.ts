@@ -47,13 +47,60 @@ interface QuestState {
   steps: Set<number>;
 }
 
+interface DiscoveryEntry {
+  seq: number;
+  name: string;
+  type: string;
+  worldspace: string;
+  x: number;
+  y: number;
+}
+
+function isDiscoveryEntry(v: unknown): v is DiscoveryEntry {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    typeof Reflect.get(v, 'seq') === 'number' &&
+    typeof Reflect.get(v, 'name') === 'string'
+  );
+}
+
 export class ProgressTracker {
   private quests: Map<string, QuestState> | null = null;
   private level: number | null = null;
+  private discoverySeq: number | null = null;
 
   reset(): void {
     this.quests = null;
     this.level = null;
+    this.discoverySeq = null;
+  }
+
+  /**
+   * Player::Discoveries → new "Discovered: X" events. The first snapshot is
+   * a baseline. A sequence number lower than the last one means the game
+   * restarted (the plugin counter starts again), so it is a new baseline too.
+   */
+  updateDiscoveries(raw: unknown, t: number): SessionEvent[] {
+    if (typeof raw !== 'object' || raw === null) return [];
+    const seq: unknown = Reflect.get(raw, 'seq');
+    const recent: unknown = Reflect.get(raw, 'recent');
+    if (typeof seq !== 'number' || !Array.isArray(recent)) return [];
+    const prev = this.discoverySeq;
+    this.discoverySeq = seq;
+    if (prev === null || seq < prev) return [];
+    return recent
+      .filter(isDiscoveryEntry)
+      .filter((d) => d.seq > prev && d.name.trim())
+      .map((d) => ({
+        t,
+        kind: 'discovery' as const,
+        text: d.name.trim(),
+        detail: typeof d.type === 'string' ? d.type : undefined,
+        worldspace: typeof d.worldspace === 'string' && d.worldspace ? d.worldspace : undefined,
+        x: typeof d.x === 'number' ? Math.round(d.x) : undefined,
+        y: typeof d.y === 'number' ? Math.round(d.y) : undefined,
+      }));
   }
 
   updateLevel(level: number | null | undefined, t: number): SessionEvent[] {

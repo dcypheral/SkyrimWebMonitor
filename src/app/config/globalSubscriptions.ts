@@ -30,4 +30,10 @@ export const JOURNEY_SUBSCRIPTIONS: Record<string, GlobalSubscriptionConfig> = {
     fields: { quests: 'Player::Quests', level: 'Player::Level' },
     settings: { frequency: 5000, sendOnChange: true },
   },
+  discoveries: {
+    subscriptionId: 'journey.discoveries',
+    fields: { discoveries: 'Player::Discoveries' },
+    settings: { frequency: 1000, sendOnChange: true },
+    requiresFeature: 'player.discoveries',
+  },
 };
