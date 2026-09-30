@@ -38,6 +38,7 @@ import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationS
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useAppLoader } from '@/app/lib/composables/useAppLoader';
 import { useBackGuard } from '@/shared/lib/composables/useBackGuard';
+import { installCompanionMode } from '@/shared/lib/native/companionMode';
 
 const navigationStore = useNavigationStore();
 const { activeTab, activeSubTab } = storeToRefs(navigationStore);
@@ -46,6 +47,7 @@ const websocketStore = useWebSocketStore();
 const { isConnected } = storeToRefs(websocketStore);
 
 useAppLoader();
+installCompanionMode();
 const { showToast } = useBackGuard();
 </script>
 

@@ -103,6 +103,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BaseIcon } from '@/shared/ui';
 import { resizeImage } from '@/shared/lib/utils/imageFile';
+import { holdTextInput } from '@/shared/lib/native/companionMode';
 import { MAX_NOTE_TEXT, MAX_NOTES, useJourneyStore, type NoteInput } from '@/stores/journey/useJourneyStore';
 import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
 import type { JourneyNote } from '@/stores/journey/lib/types';
@@ -136,6 +137,9 @@ const whereText = computed(() => {
   return player.displayPosition ? t('pages.journal.pinHere') : t('pages.journal.noPin');
 });
 
+// Typing needs keyboard focus: pause companion mode while the editor is open.
+const releaseTextHold = holdTextInput();
+
 onMounted(async () => {
   if (props.note?.hasPhoto) photoUrl.value = await store.photoUrl(props.note.id);
   await nextTick();
@@ -143,6 +147,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  releaseTextHold();
   if (ownUrl) URL.revokeObjectURL(ownUrl);
 });
 

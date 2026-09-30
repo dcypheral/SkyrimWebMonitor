@@ -107,6 +107,11 @@
         "storage": "{sessions} sessions, {notes} notes, about {size} used on this device",
         "deleteAll": "Delete all journal data",
         "confirmDeleteAll": "Tap again to delete everything"
+      },
+      "companion": {
+        "title": "Dual screen",
+        "toggle": "Keep the controller on the game",
+        "hint": "Taps on this app no longer take the controller from the game on the other screen. Text fields pause this: tap a text field once, then again to open the keyboard."
       }
     }
   },
