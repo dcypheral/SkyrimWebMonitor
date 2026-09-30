@@ -332,7 +332,7 @@ class WebSocketClient {
       return false;
     }
 
-    const { command, formId, active, hand, count, slot, x, y, z, path } = options;
+    const { command, formId, active, hand, count, slot, x, y, z, path, maxSize } = options;
     const message: CommandMessage = {
       type: 'command',
       id,
@@ -346,6 +346,7 @@ class WebSocketClient {
       ...(y !== undefined && { y }),
       ...(z !== undefined && { z }),
       ...(path !== undefined && { path }),
+      ...(maxSize !== undefined && { maxSize }),
     };
     return this.send(message);
   }

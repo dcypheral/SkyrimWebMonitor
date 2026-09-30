@@ -5,10 +5,14 @@
     :effects="data?.enchantment?.effects"
   >
     <template #icon>
-      <weapon-icon
+      <item-thumbnail
         v-if="data"
-        :weapon-type="data.weaponType"
-        :size="48"
+        :fallback-icon-path="getWeaponIconPath(data.weaponType)"
+        :model-path="data.modelPath"
+        :keywords="data.keywords"
+        :enchanted="!!data.enchantment"
+        :size="96"
+        framing="diagonal"
       />
     </template>
   </base-preview>
@@ -18,7 +22,8 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BasePreview } from '@/shared/ui/items';
-import { WeaponIcon } from '@/entities/ui';
+import { ItemThumbnail } from '@/entities/ui/icons';
+import { getWeaponIconPath } from '@/shared/lib/constants/weaponIcons';
 import { getRoundValue } from '@/shared/lib/utils/getDescriptionValues';
 import type { WeaponItem } from '@/stores/inventory/lib/types';
 

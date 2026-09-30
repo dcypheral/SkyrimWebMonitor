@@ -75,6 +75,14 @@
         "reloading": "Reloading…",
         "disableGfxIcons": "Disable game icons"
       },
+      "itemThumbnails": {
+        "title": "Item thumbnails",
+        "disable": "Use icons instead of 3D thumbnails",
+        "hint": "Weapons and apparel are rendered from the game's own models the first time you see them, then cached on this device.",
+        "clear": "Clear thumbnail cache",
+        "clearing": "Clearing…",
+        "count": "Rendered this session: {count}"
+      },
       "updateDll": "Update SkyrimWebSocket.dll to use this feature"
     }
   },

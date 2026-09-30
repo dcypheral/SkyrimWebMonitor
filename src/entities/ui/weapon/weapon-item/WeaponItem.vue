@@ -5,6 +5,16 @@
     :is-favorite="isFavorite"
     :active="active"
   >
+    <template #icon>
+      <item-thumbnail
+        :fallback-icon-path="getWeaponIconPath(weaponType)"
+        :model-path="modelPath"
+        :keywords="keywords"
+        :enchanted="enchanted"
+        :size="36"
+        framing="diagonal"
+      />
+    </template>
     <template #status>
       <equipped-hand-icon
         v-if="isEquipped"
@@ -17,6 +27,8 @@
 <script setup lang="ts">
 import { InventoryItem } from '@/shared/ui/items';
 import { EquippedHandIcon } from '@/shared/ui';
+import { getWeaponIconPath } from '@/shared/lib/constants/weaponIcons';
+import { ItemThumbnail } from '@/entities/ui/icons';
 import type { WeaponType } from '@/stores/inventory/lib/types';
 import type { EquippedHand } from '@/shared/lib/types';
 
@@ -28,5 +40,8 @@ defineProps<{
   isEquipped?: boolean;
   equippedHand?: EquippedHand;
   active?: boolean;
+  modelPath?: string | null;
+  keywords?: string[] | null;
+  enchanted?: boolean;
 }>();
 </script>

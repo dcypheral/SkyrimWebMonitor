@@ -4,9 +4,13 @@
     :stats="stats"
   >
     <template #icon>
-      <base-icon
-        icon-path="lorc/arrow-cluster.svg"
-        :size="48"
+      <item-thumbnail
+        v-if="data"
+        fallback-icon-path="lorc/arrow-cluster.svg"
+        :model-path="data.modelPath"
+        :keywords="data.keywords"
+        :size="96"
+        framing="diagonal"
       />
     </template>
   </base-preview>
@@ -16,7 +20,7 @@
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BasePreview } from '@/shared/ui/items';
-import { BaseIcon } from '@/shared/ui';
+import { ItemThumbnail } from '@/entities/ui/icons';
 import { getRoundValue } from '@/shared/lib/utils/getDescriptionValues';
 import type { AmmoItem } from '@/stores/inventory/lib/types';
 

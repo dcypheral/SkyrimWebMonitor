@@ -3,6 +3,14 @@
     class="inv-item"
     :class="{ 'inv-item--favorite': isFavorite, 'inv-item--active': active }"
   >
+    <!-- Optional leading icon / thumbnail -->
+    <div
+      v-if="$slots.icon"
+      class="inv-icon"
+    >
+      <slot name="icon" />
+    </div>
+
     <!-- Main content -->
     <div class="inv-info">
       <div class="inv-row">
@@ -105,8 +113,13 @@ defineProps<{
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  margin-left: var(--spacing-sm);
+
+  + .inv-info {
+    padding-left: var(--spacing-xs, 4px);
+  }
 }
 
 .inv-quantity {

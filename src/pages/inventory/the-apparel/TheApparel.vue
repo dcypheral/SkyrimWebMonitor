@@ -17,6 +17,10 @@
         :is-favorite="item.isFavorite || false"
         :active="active"
         :quantity="item.count"
+        :body-slots="item.bodySlots"
+        :model-path="item.modelPath"
+        :keywords="item.keywords"
+        :enchanted="!!item.enchantment"
         @click="onSelect"
       />
     </template>

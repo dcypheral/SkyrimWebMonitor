@@ -112,6 +112,10 @@ export interface BaseItem {
   name: string;
   value: number;
   weight: number;
+  /** Keyword editor IDs (plugin feature "inventory.models"); absent on older plugins. */
+  keywords?: string[];
+  /** Data-relative model path ("meshes/..."), null when the form has no model. */
+  modelPath?: string | null;
 }
 
 export interface WeaponItem extends BaseItem {

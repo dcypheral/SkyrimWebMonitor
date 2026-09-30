@@ -6,6 +6,15 @@
     :active="active"
     @click="$emit('click')"
   >
+    <template #icon>
+      <item-thumbnail
+        fallback-icon-path="lorc/arrow-cluster.svg"
+        :model-path="modelPath"
+        :keywords="keywords"
+        :size="36"
+        framing="diagonal"
+      />
+    </template>
     <template #status>
       <equip-status :is-equipped="isEquipped" />
     </template>
@@ -14,6 +23,7 @@
 
 <script setup lang="ts">
 import { InventoryItem, EquipStatus } from '@/shared/ui/items';
+import { ItemThumbnail } from '@/entities/ui/icons';
 
 defineProps<{
   name: string;
@@ -21,6 +31,8 @@ defineProps<{
   isFavorite?: boolean;
   isEquipped?: boolean;
   active?: boolean;
+  modelPath?: string | null;
+  keywords?: string[] | null;
 }>();
 
 defineEmits<{

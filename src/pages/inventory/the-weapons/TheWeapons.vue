@@ -18,6 +18,9 @@
         :is-favorite="item.isFavorite || false"
         :active="active"
         :quantity="item.count"
+        :model-path="item.modelPath"
+        :keywords="item.keywords"
+        :enchanted="!!item.enchantment"
         @click="onSelect"
       />
       <ammo-item
@@ -27,6 +30,8 @@
         :is-favorite="item.isFavorite || false"
         :active="active"
         :quantity="item.count"
+        :model-path="item.modelPath"
+        :keywords="item.keywords"
         template
         @click="onSelect"
       />
