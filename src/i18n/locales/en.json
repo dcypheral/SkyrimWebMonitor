@@ -132,6 +132,11 @@
         "colMax": "max ms",
         "colSlow": ">4 ms"
       }
+    },
+    "offline": {
+      "title": "Offline",
+      "savedAt": "Offline · saved {when}",
+      "connect": "Connect"
     }
   },
   "pages": {
@@ -495,7 +500,8 @@
         "iconsBy": "Icons -",
         "mapFrom": "Tamriel map -",
         "enderal_attr": "for development and assets of",
-        "thanks": "Thanks"
+        "thanks": "Thanks",
+        "browseOffline": "Browse offline"
       },
       "magicItem": {
         "ready": "Ready",

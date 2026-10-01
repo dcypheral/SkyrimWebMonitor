@@ -72,6 +72,13 @@
         >
           {{ $t('shared.ui.connectionStatus.reconnect') }}
         </button>
+        <button
+          v-if="offline.hasSnapshot"
+          class="btn btn-lg"
+          @click="offline.wantsConnectScreen = false"
+        >
+          {{ $t('shared.ui.connectionStatus.browseOffline') }}
+        </button>
       </div>
     </div>
 
@@ -85,6 +92,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
+import { useOfflineStore } from '@/stores/offline/useOfflineStore';
 import { CONNECTION_STATUS } from '@/shared/lib/constants/connection';
 import { normalizeWsUrl } from '@/shared/lib/config/websocket';
 import AttributionCredits from '../attribution-credits/AttributionCredits.vue';
@@ -99,6 +107,7 @@ type StatusState =
 
 const { t } = useI18n();
 const wsStore = useWebSocketStore();
+const offline = useOfflineStore();
 const endpointDraft = ref(wsStore.endpointUrl);
 const endpointError = ref('');
 
@@ -293,6 +302,10 @@ function handleReconnect(): void {
 }
 
 .actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-sm);
   margin-top: var(--spacing-sm);
 }
 

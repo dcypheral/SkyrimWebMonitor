@@ -9,6 +9,7 @@ import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
 import { useQuestStore } from '@/stores/quests/useQuestStore';
 import { useJourneyStore } from '@/stores/journey/useJourneyStore';
 import { useRecordsStore } from '@/stores/character/useRecordsStore';
+import { useOfflineStore } from '@/stores/offline/useOfflineStore';
 import type { RouterResult } from './lib/types';
 import { isCharacterStatsData, isWeaponsData, isApparelData, isFoodData, isPotionsData, isScrollsData, isKeysData, isBooksData, isInventoryCategories, isIngredientsData, isMiscData, isMagicCategoriesData, isDestructionData, isAlterationData, isConjurationData, isIllusionData, isRestorationData, isEnchantingData, isShoutsData, isHotkeyItemsData, isQuestsData, isGameStatusData, isMapHotspotsData, isMapQuestMarkersData, isPlayerPositionData, isPowerItem } from './typeGuards';
 import { logger } from '@/shared/lib/utils/logger';
@@ -17,6 +18,8 @@ export class DataRouter {
   static routeDataById(subscriptionId: string, data: unknown): RouterResult {
     const characterStore = useCharacterStore();
     const inventoryStore = useInventoryStore();
+    // Keep a copy for offline browsing (no-op while restoring that copy).
+    useOfflineStore().record(subscriptionId, data);
     try {
       if (subscriptionId === 'character.records') {
         useRecordsStore().setRecords(data);

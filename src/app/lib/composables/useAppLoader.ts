@@ -17,6 +17,8 @@ import { GLOBAL_SUBSCRIPTIONS, JOURNEY_SUBSCRIPTIONS } from '@/app/config/global
 import { journeyRecordingEnabled } from '@/shared/lib/settings/journeyPreference';
 import { useJourneyStore } from '@/stores/journey/useJourneyStore';
 import { DataRouter } from '@/stores/adapters/dataRouter';
+import { useOfflineStore } from '@/stores/offline/useOfflineStore';
+import { useSnapshotSweep } from './useSnapshotSweep';
 import { prefetchMapTiles, getMapConfig } from '@/pages/map';
 import { logger } from '@/shared/lib/utils/logger';
 
@@ -98,9 +100,45 @@ export function useAppLoader() {
     startJourneySubscriptions();
   };
 
+  // ─── Offline snapshot ────────────────────────────────────────────────
+  const offline = useOfflineStore();
+  useSnapshotSweep();
+
+  watch(isConnected, (connected) => {
+    if (connected) {
+      offline.markLive();
+      return;
+    }
+    // The game went away: save what we have.
+    void offline.flush();
+    void journeyStore.flush();
+  });
+
+  // After the client's retry budget runs out, keep looking for the game
+  // slowly, so starting Skyrim later reconnects without a tap.
+  const RETRY_IDLE_MS = 30_000;
+  const retryIfIdle = (): void => {
+    if (!isConnected.value && websocketStore.reconnectFailed) void websocketStore.reconnect();
+  };
+  setInterval(retryIfIdle, RETRY_IDLE_MS);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') retryIfIdle();
+    });
+  }
+
   onMounted(async () => {
     // Journal and map notes work offline too.
     void journeyStore.load();
+
+    // Last known game state, shown read-only until live data arrives.
+    void offline.load().then(() => {
+      if (isConnected.value) return;
+      offline.restore(
+        (id, data) => DataRouter.routeDataById(id, data),
+        (fields) => systemStore.handleQueryResponse(fields),
+      );
+    });
 
     // Kick off DZI tile prefetch in the background BEFORE awaiting the
     // websocket connection. `connect()` can take a while (or hang while the

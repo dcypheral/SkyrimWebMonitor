@@ -11,7 +11,7 @@
         class="map-overlay"
         :img-natural-w="imgNaturalW"
         :img-natural-h="imgNaturalH"
-        :scale="scale"
+        :scale="markerScale"
         :cover-scale="coverScale"
         :overlay-style="overlayStyle"
         :project-world-to-image="projectWorldToImage"
@@ -210,6 +210,14 @@ const imgNaturalH = ref(0);
  * marker SVG overlay can mirror the image transform exactly.
  */
 const scale = ref(0);
+/**
+ * Scale the markers are sized for. During a zoom animation the overlay just
+ * scales with the map (CSS transform) and markers are re-laid out once the
+ * animation ends; re-rendering every marker on every frame of a pinch made
+ * frames drop and markers flicker.
+ */
+const markerScale = ref(0);
+let isAnimating = false;
 const translateX = ref(0);
 const translateY = ref(0);
 const containerWidth = ref(0);
@@ -295,6 +303,7 @@ function syncOverlayTransform(): void {
     if (Math.abs(scale.value - s) > 1e-6) {
       scale.value = s;
     }
+    if (!isAnimating || markerScale.value === 0) settleMarkerScale();
     if (Math.abs(translateX.value - p0.x) > 1e-3) {
       translateX.value = p0.x;
     }
@@ -302,6 +311,10 @@ function syncOverlayTransform(): void {
       translateY.value = p0.y;
     }
   }
+}
+
+function settleMarkerScale(): void {
+  if (Math.abs(markerScale.value - scale.value) > 1e-6) markerScale.value = scale.value;
 }
 
 function syncContainerSize(): void {
@@ -498,6 +511,12 @@ async function setupViewer(): Promise<void> {
   const tileSources = await detectTileSource(config);
 
   viewer = OpenSeadragon({
+    // 2D canvas drawer. OSD's default WebGL drawer renders into its own GL
+    // canvas and copies every frame into a 2D canvas; on mobile WebViews
+    // that copy stalls and tiles flash while panning. Measured with the
+    // same pan/zoom script in a software-GL test browser: median frame
+    // 167 ms (WebGL) vs 33 ms (canvas).
+    drawer: 'canvas',
     element: host,
     tileSources,
     prefixUrl: '',
@@ -605,6 +624,13 @@ async function setupViewer(): Promise<void> {
   });
 
   viewer.addHandler('update-viewport', syncOverlayTransform);
+  viewer.addHandler('animation-start', () => {
+    isAnimating = true;
+  });
+  viewer.addHandler('animation-finish', () => {
+    isAnimating = false;
+    settleMarkerScale();
+  });
   viewer.addHandler('resize', () => {
     syncContainerSize();
     allowZoomOutToFit();
@@ -650,6 +676,8 @@ function destroyViewer(): void {
   imgNaturalW.value = 0;
   imgNaturalH.value = 0;
   scale.value = 0;
+  markerScale.value = 0;
+  isAnimating = false;
   translateX.value = 0;
   translateY.value = 0;
 }

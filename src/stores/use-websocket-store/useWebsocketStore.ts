@@ -18,6 +18,7 @@ import type {
 import { DataRouter } from '@/stores/adapters/dataRouter';
 import type { Subscription } from './lib/types';
 import { SYSTEM_QUERY_ID, SYSTEM_QUERY_FIELDS, useSystemStore } from '@/stores/system/useSystemStore';
+import { useOfflineStore } from '@/stores/offline/useOfflineStore';
 import { applyFixturesIfEnabled } from '@/stores/fixtures/fixtureLoader';
 import { logger } from '@/shared/lib/utils/logger';
 
@@ -360,7 +361,10 @@ export const useWebSocketStore = defineStore('websocket', () => {
       reconnectAttempt.value = 0;
       reconnectFailed.value = false;
       logger.log('WebSocket connected, ready for subscriptions');
-      sendQuery(SYSTEM_QUERY_ID, SYSTEM_QUERY_FIELDS, (fields) => useSystemStore().handleQueryResponse(fields));
+      sendQuery(SYSTEM_QUERY_ID, SYSTEM_QUERY_FIELDS, (fields) => {
+        useSystemStore().handleQueryResponse(fields);
+        useOfflineStore().recordSystem(fields);
+      });
     });
 
     unsubscribeFromClose = wsClient.on('onClose', () => {

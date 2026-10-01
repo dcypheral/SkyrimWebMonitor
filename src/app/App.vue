@@ -1,6 +1,6 @@
 <template>
   <div class="handheld-device">
-    <template v-if="isConnected">
+    <template v-if="showMain">
       <!-- Home uses the whole screen; its vitals row replaces the top bar. -->
       <skyrim-navigation
         v-if="activeTab !== 'home'"
@@ -15,6 +15,7 @@
         />
       </main>
 
+      <offline-pill v-if="!isConnected" />
       <skyrim-dock />
     </template>
 
@@ -29,7 +30,8 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { SkyrimNavigation, SkyrimContent, SkyrimDock } from '@/app/ui';
+import { computed } from 'vue';
+import { SkyrimNavigation, SkyrimContent, SkyrimDock, OfflinePill } from '@/app/ui';
 import {
   ConnectionStatus,
   SkyrimModal,
@@ -39,6 +41,7 @@ import {
 } from '@/shared/ui';
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
+import { useOfflineStore } from '@/stores/offline/useOfflineStore';
 import { useAppLoader } from '@/app/lib/composables/useAppLoader';
 import { ModelViewerOverlay } from '@/entities/ui/icons';
 import { useBackGuard } from '@/shared/lib/composables/useBackGuard';
@@ -49,6 +52,11 @@ const { activeTab, activeSubTab } = storeToRefs(navigationStore);
 
 const websocketStore = useWebSocketStore();
 const { isConnected } = storeToRefs(websocketStore);
+
+// Offline: browse the saved game state until the game connects.
+const offline = useOfflineStore();
+const { hasSnapshot, wantsConnectScreen } = storeToRefs(offline);
+const showMain = computed(() => isConnected.value || (hasSnapshot.value && !wantsConnectScreen.value));
 
 useAppLoader();
 installCompanionMode();
