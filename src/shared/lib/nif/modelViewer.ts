@@ -6,12 +6,14 @@
  * thumbnail renderer (lights fixed to the camera, model turns under them).
  */
 import { computeNormals, modelOrientation, mul, rotX, rotZ, type ThumbnailFraming, type ThumbnailTextureSource } from './renderThumbnail';
-import type { NifModel } from './types';
+import type { NifMesh, NifModel } from './types';
+import { FRAGMENT_SHADER, applyMaterial, bindColors, drawOrder, materialLocations, resetBlend, type MaterialLocations } from './material';
 
 const VERTEX_SHADER = `
 attribute vec3 aPosition;
 attribute vec3 aNormal;
 attribute vec2 aUv;
+attribute vec4 aColor;
 uniform mat3 uRotation;
 uniform vec3 uCenter;
 uniform float uScale;
@@ -19,49 +21,17 @@ uniform float uDepth;
 uniform vec2 uAspect;
 varying vec3 vNormal;
 varying vec2 vUv;
+varying vec4 vColor;
 void main() {
   vec3 p = uRotation * (aPosition - uCenter) * uScale;
   vNormal = uRotation * aNormal;
   vUv = aUv;
+  vColor = aColor;
   // View space: x right, z up, y depth (camera looks along +y).
   gl_Position = vec4(p.x * uAspect.x, p.z * uAspect.y, p.y * uDepth, 1.0);
 }
 `;
 
-const FRAGMENT_SHADER = `
-precision mediump float;
-varying vec3 vNormal;
-varying vec2 vUv;
-uniform sampler2D uTexture;
-uniform bool uHasTexture;
-uniform vec3 uTint;
-uniform float uAlphaCutoff;
-// < 0: opaque. Otherwise the surface is alpha-blended (glass): texture alpha,
-// or this value for untextured meshes.
-uniform float uOpacity;
-void main() {
-  vec4 base = uHasTexture ? texture2D(uTexture, vUv) : vec4(uTint, 1.0);
-  if (base.a < uAlphaCutoff) discard;
-  vec3 n = normalize(vNormal);
-  vec3 toCamera = vec3(0.0, -1.0, 0.0);
-  if (dot(n, toCamera) < 0.0) n = -n;
-  vec3 keyDir = normalize(vec3(-0.55, -0.7, 0.75));
-  vec3 fillDir = normalize(vec3(0.8, -0.4, -0.2));
-  float key = max(dot(n, keyDir), 0.0);
-  float fill = max(dot(n, fillDir), 0.0);
-  float rim = pow(1.0 - max(dot(n, toCamera), 0.0), 2.5);
-  vec3 halfVec = normalize(keyDir + toCamera);
-  float spec = pow(max(dot(n, halfVec), 0.0), 32.0);
-  vec3 color = base.rgb * (0.38 + 0.8 * key * vec3(1.0, 0.96, 0.9) + 0.25 * fill * vec3(0.8, 0.88, 1.0));
-  color += spec * 0.1 * vec3(1.0, 0.97, 0.9);
-  color += rim * 0.16 * vec3(0.85, 0.9, 1.0);
-  float alpha = uOpacity < 0.0 ? 1.0 : (uHasTexture ? base.a : uOpacity);
-  gl_FragColor = vec4(min(color, vec3(1.0)), alpha);
-}
-`;
-
-/** Opacity of untextured see-through meshes. */
-const GLASS_OPACITY = 0.35;
 
 interface DrawCall {
   position: WebGLBuffer;
@@ -71,9 +41,8 @@ interface DrawCall {
   count: number;
   indexType: number;
   texture: WebGLTexture | null;
-  alphaCutoff: number;
-  /** Drawn after opaque meshes, blended, without depth writes. */
-  blend: boolean;
+  color: WebGLBuffer | null;
+  mesh: NifMesh;
 }
 
 export interface ViewerModelOptions {
@@ -85,6 +54,7 @@ export interface ViewerModelOptions {
 export class NifViewer {
   private gl: WebGLRenderingContext;
   private program: WebGLProgram;
+  private materialLoc: MaterialLocations;
   private draws: DrawCall[] = [];
   private textures: WebGLTexture[] = [];
   private base: number[] = [1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -107,6 +77,7 @@ export class NifViewer {
     const program = link(gl, VERTEX_SHADER, FRAGMENT_SHADER);
     if (!program) throw new Error('Shader setup failed');
     this.program = program;
+    this.materialLoc = materialLocations(gl, program);
     gl.getExtension('OES_element_index_uint');
   }
 
@@ -186,8 +157,8 @@ export class NifViewer {
         count: indexData.length,
         indexType,
         texture,
-        alphaCutoff: texture && mesh.alphaTest ? Math.max(mesh.alphaThreshold, 0.05) : -1,
-        blend: mesh.alphaBlend,
+        color: mesh.colors && mesh.colors.length === vertexCount * 4 ? buffer(mesh.colors, gl.ARRAY_BUFFER) : null,
+        mesh,
       });
     }
     this.requestRender();
@@ -242,30 +213,19 @@ export class NifViewer {
     const aPosition = gl.getAttribLocation(this.program, 'aPosition');
     const aNormal = gl.getAttribLocation(this.program, 'aNormal');
     const aUv = gl.getAttribLocation(this.program, 'aUv');
-    // Opaque first, then see-through surfaces (potion glass) over them.
-    const ordered = [...this.draws.filter((d) => !d.blend), ...this.draws.filter((d) => d.blend)];
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    for (const d of ordered) {
-      if (d.blend) {
-        gl.enable(gl.BLEND);
-        gl.depthMask(false);
-      } else {
-        gl.disable(gl.BLEND);
-        gl.depthMask(true);
-      }
-      gl.uniform1f(u('uOpacity'), d.blend ? GLASS_OPACITY : -1);
+    // Opaque first, then see-through surfaces (glass, liquids, glows).
+    for (const d of drawOrder(this.draws)) {
+      applyMaterial(gl, this.materialLoc, d.mesh, !!d.texture);
       bindAttr(gl, aPosition, d.position, 3);
       bindAttr(gl, aNormal, d.normal, 3);
       bindAttr(gl, aUv, d.uv, 2);
+      bindColors(gl, this.materialLoc.color, d.color);
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, d.texture);
-      gl.uniform1i(u('uHasTexture'), d.texture ? 1 : 0);
-      gl.uniform1f(u('uAlphaCutoff'), d.alphaCutoff);
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, d.index);
       gl.drawElements(gl.TRIANGLES, d.count, d.indexType, 0);
     }
-    gl.disable(gl.BLEND);
-    gl.depthMask(true);
+    resetBlend(gl);
   }
 
   private clear(): void {
@@ -275,6 +235,7 @@ export class NifViewer {
       gl.deleteBuffer(d.normal);
       gl.deleteBuffer(d.uv);
       gl.deleteBuffer(d.index);
+      if (d.color) gl.deleteBuffer(d.color);
     }
     for (const t of this.textures) gl.deleteTexture(t);
     this.draws = [];

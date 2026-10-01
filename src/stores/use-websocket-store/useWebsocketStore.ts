@@ -59,6 +59,15 @@ function isAnyResult(_data: unknown): _data is unknown {
   return true;
 }
 
+/** Commands that edit bookkeeping state and are safe while the game is paused. */
+const UNGATED_COMMANDS: ReadonlySet<string> = new Set([
+  'hotkey_set',
+  'hotkey_clear',
+  'favorite',
+  'favorite_spell',
+  'favorite_shout',
+]);
+
 export const useWebSocketStore = defineStore('websocket', () => {
   // State
   const status = ref<string>(CONNECTION_STATUS.DISCONNECTED);
@@ -208,6 +217,7 @@ export const useWebSocketStore = defineStore('websocket', () => {
   ): void => {
     if (!wsClient.isConnected()) {
       console.warn('WebSocket is not connected, cannot send command');
+      onResult?.({ type: 'commandResult', id: '', success: false, error: 'not connected' });
       return;
     }
     const { command, formId, slot } = options;
@@ -218,7 +228,13 @@ export const useWebSocketStore = defineStore('websocket', () => {
         onFail: () => undefined,
       });
     }
-    wsClient.command(commandId, options);
+    // Bookkeeping commands (hotkeys, favorites) also work while the game is
+    // paused or in a menu; only actions in the world wait for `canAct`.
+    const sent = wsClient.command(commandId, options, !UNGATED_COMMANDS.has(options.command));
+    if (!sent && onResult) {
+      pendingCommands.delete(commandId);
+      onResult({ type: 'commandResult', id: commandId, success: false, error: 'game not ready' });
+    }
   };
 
   /**

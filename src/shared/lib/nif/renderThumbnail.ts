@@ -8,6 +8,7 @@
  * One shared GL context is reused for every thumbnail: mobile browsers cap
  * the number of live contexts, so creating one per item would fail quickly.
  */
+import { FRAGMENT_SHADER, applyMaterial, bindColors, drawOrder, materialLocations, resetBlend, type MaterialLocations } from './material';
 import type { NifMesh, NifModel } from './types';
 
 export type ThumbnailFraming = 'diagonal' | 'upright';
@@ -38,56 +39,22 @@ const VERTEX_SHADER = `
 attribute vec3 aPosition;
 attribute vec3 aNormal;
 attribute vec2 aUv;
+attribute vec4 aColor;
 uniform vec3 uScale;
 uniform vec3 uOffset;
 varying vec3 vNormal;
 varying vec2 vUv;
+varying vec4 vColor;
 void main() {
   vNormal = aNormal;
   vUv = aUv;
+  vColor = aColor;
   // View space: x right, z up, y depth (camera looks along +y).
   vec3 p = aPosition * uScale + uOffset;
   gl_Position = vec4(p.x, p.z, p.y, 1.0);
 }
 `;
 
-const FRAGMENT_SHADER = `
-precision mediump float;
-varying vec3 vNormal;
-varying vec2 vUv;
-uniform sampler2D uTexture;
-uniform bool uHasTexture;
-uniform vec3 uTint;
-uniform float uAlphaCutoff;
-// < 0: opaque. Otherwise the surface is alpha-blended (glass): texture alpha,
-// or this value for untextured meshes.
-uniform float uOpacity;
-void main() {
-  vec4 base = uHasTexture ? texture2D(uTexture, vUv) : vec4(uTint, 1.0);
-  if (base.a < uAlphaCutoff) discard;
-
-  vec3 n = normalize(vNormal);
-  vec3 toCamera = vec3(0.0, -1.0, 0.0);
-  // Two-sided lighting: winding is not consistent across item meshes, so
-  // always light the side that faces the camera.
-  if (dot(n, toCamera) < 0.0) n = -n;
-
-  vec3 keyDir = normalize(vec3(-0.55, -0.7, 0.75));
-  vec3 fillDir = normalize(vec3(0.8, -0.4, -0.2));
-  float key = max(dot(n, keyDir), 0.0);
-  float fill = max(dot(n, fillDir), 0.0);
-  float rim = pow(1.0 - max(dot(n, toCamera), 0.0), 2.5);
-  vec3 halfVec = normalize(keyDir + toCamera);
-  float spec = pow(max(dot(n, halfVec), 0.0), 32.0);
-
-  // Matte look: game textures already carry their own shading detail.
-  vec3 color = base.rgb * (0.38 + 0.8 * key * vec3(1.0, 0.96, 0.9) + 0.25 * fill * vec3(0.8, 0.88, 1.0));
-  color += spec * 0.08 * vec3(1.0, 0.97, 0.9);
-  color += rim * 0.14 * vec3(0.85, 0.9, 1.0);
-  float alpha = uOpacity < 0.0 ? 1.0 : (uHasTexture ? base.a : uOpacity);
-  gl_FragColor = vec4(min(color, vec3(1.0)), alpha);
-}
-`;
 
 interface GlState {
   canvas: HTMLCanvasElement;
@@ -101,17 +68,12 @@ interface GlState {
     scale: WebGLUniformLocation | null;
     offset: WebGLUniformLocation | null;
     texture: WebGLUniformLocation | null;
-    hasTexture: WebGLUniformLocation | null;
     tint: WebGLUniformLocation | null;
-    alphaCutoff: WebGLUniformLocation | null;
-    opacity: WebGLUniformLocation | null;
   };
+  material: MaterialLocations;
 }
 
 let glState: GlState | null = null;
-
-/** Opacity of untextured see-through meshes. */
-const GLASS_OPACITY = 0.35;
 
 export function isThumbnailRenderingSupported(): boolean {
   try {
@@ -151,7 +113,9 @@ export function renderNifThumbnail(model: NifModel, options: ThumbnailOptions = 
 
   // Fit: transform all vertices once to find the view-space bounds.
   const transformed = meshes.map((mesh) => transformMesh(mesh, orientation));
-  const bounds = viewBounds(transformed.map((t) => t.positions));
+  // Glow and other effect planes do not decide the framing.
+  const solid = transformed.filter((_, i) => !meshes[i].isEffect);
+  const bounds = viewBounds((solid.length ? solid : transformed).map((t) => t.positions));
   if (!bounds) return null;
 
   const width = bounds.max[0] - bounds.min[0];
@@ -187,23 +151,13 @@ export function renderNifThumbnail(model: NifModel, options: ThumbnailOptions = 
   const textureCache = new Map<string, WebGLTexture | null>();
 
   try {
-    // Opaque first, then see-through surfaces (potion glass) over them.
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    for (const pass of [false, true]) {
-      if (pass) {
-        gl.enable(gl.BLEND);
-        gl.depthMask(false);
-      }
-      transformed.forEach((geometry, i) => {
-        const mesh = meshes[i];
-        if (mesh.alphaBlend !== pass) return;
-        gl.uniform1f(locations.opacity, pass ? GLASS_OPACITY : -1);
-        drawMesh(state, mesh, geometry, options.textures, textureCache, created);
-      });
+    // Opaque first, then see-through surfaces (glass, liquids, glows).
+    const items = transformed.map((geometry, i) => ({ mesh: meshes[i], geometry }));
+    for (const item of drawOrder(items)) {
+      drawMesh(state, item.mesh, item.geometry, options.textures, textureCache, created);
     }
   } finally {
-    gl.disable(gl.BLEND);
-    gl.depthMask(true);
+    resetBlend(gl);
     for (const b of created.buffers) gl.deleteBuffer(b);
     for (const t of created.textures) gl.deleteTexture(t);
   }
@@ -241,11 +195,9 @@ function getGl(): GlState | null {
       scale: gl.getUniformLocation(program, 'uScale'),
       offset: gl.getUniformLocation(program, 'uOffset'),
       texture: gl.getUniformLocation(program, 'uTexture'),
-      hasTexture: gl.getUniformLocation(program, 'uHasTexture'),
       tint: gl.getUniformLocation(program, 'uTint'),
-      alphaCutoff: gl.getUniformLocation(program, 'uAlphaCutoff'),
-      opacity: gl.getUniformLocation(program, 'uOpacity'),
     },
+    material: materialLocations(gl, program),
   };
   return glState;
 }
@@ -516,6 +468,8 @@ function drawMesh(
   bind(locations.position, geometry.positions, 3);
   bind(locations.normal, geometry.normals, 3);
   bind(locations.uv, mesh.uvs ?? new Float32Array(vertexCount * 2), 2);
+  if (mesh.colors && mesh.colors.length === vertexCount * 4) bind(state.material.color, mesh.colors, 4);
+  else bindColors(gl, state.material.color, null);
 
   let texture: WebGLTexture | null = null;
   const texturePath = mesh.diffuseTexture;
@@ -530,8 +484,7 @@ function drawMesh(
   }
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.uniform1i(locations.hasTexture, texture ? 1 : 0);
-  gl.uniform1f(locations.alphaCutoff, texture && mesh.alphaTest ? Math.max(mesh.alphaThreshold, 0.05) : -1);
+  applyMaterial(gl, state.material, mesh, !!texture);
 
   const indexBuffer = gl.createBuffer();
   if (!indexBuffer) return;

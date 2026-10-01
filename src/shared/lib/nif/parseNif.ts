@@ -10,7 +10,7 @@
  * against vanilla SSE meshes.
  */
 import { BinaryReader } from './reader';
-import type { NifBounds, NifInvMarker, NifMesh, NifModel } from './types';
+import type { NifBounds, NifInvMarker, NifMaterial, NifMesh, NifModel } from './types';
 
 const NIF_VERSION_20_2_0_7 = 0x14020007;
 const NO_REF = -1;
@@ -43,6 +43,7 @@ const NI_GEOMETRY_TYPES = new Set(['NiTriShape', 'NiTriStrips']);
 const VA_VERTEX = 0x001;
 const VA_UV = 0x002;
 const VA_NORMAL = 0x008;
+const VA_COLOR = 0x020;
 const VA_FULL_PRECISION = 0x400;
 
 // NiAVObject flag: hidden.
@@ -81,12 +82,39 @@ interface AvObject {
 interface ShaderInfo {
   diffuseTexture: string | null;
   isEffectShader: boolean;
+  material: NifMaterial;
+}
+
+// Skyrim shader flags (BSLightingShaderProperty / BSEffectShaderProperty).
+const SLSF1_VERTEX_ALPHA = 1 << 3;
+const SLSF1_GREYSCALE_TO_PALETTE_COLOR = 1 << 4;
+const SLSF1_OWN_EMIT = 1 << 22;
+const SLSF2_VERTEX_COLORS = 1 << 5;
+const SLSF2_GLOW_MAP = 1 << 6;
+// BSLightingShaderProperty shader type with an inner layer texture (slot 6).
+const SHADER_TYPE_MULTI_LAYER_PARALLAX = 11;
+
+function defaultMaterial(kind: NifMaterial['kind']): NifMaterial {
+  return {
+    kind,
+    shaderType: 0,
+    flags1: 0,
+    flags2: 0,
+    textures: [],
+    emissive: [0, 0, 0],
+    emissiveMultiple: 0,
+    alpha: 1,
+    useVertexColors: false,
+    useVertexAlpha: false,
+    greyscaleTexture: null,
+  };
 }
 
 interface VertexDesc {
   vertexSize: number;
   uvOffset: number;
   normalOffset: number;
+  colorOffset: number;
   flags: number;
 }
 
@@ -265,39 +293,115 @@ function findInvMarker(bytes: Uint8Array, header: Header, extraData: number[]): 
 
 function readShader(bytes: Uint8Array, header: Header, ref: number): ShaderInfo {
   const type = typeOf(header, ref);
-  if (type === 'BSEffectShaderProperty') return { diffuseTexture: null, isEffectShader: true };
-  if (type !== 'BSLightingShaderProperty') return { diffuseTexture: null, isEffectShader: false };
+  if (type === 'BSEffectShaderProperty') return readEffectShader(bytes, header, ref);
+  if (type !== 'BSLightingShaderProperty') {
+    return { diffuseTexture: null, isEffectShader: false, material: defaultMaterial('none') };
+  }
 
+  const material = defaultMaterial('lighting');
   const r = blockReader(bytes, header, ref);
-  if (header.bsVersion <= 130) r.u32(); // Skyrim shader type (precedes NiObjectNET)
+  if (header.bsVersion <= 130) material.shaderType = r.u32(); // Skyrim shader type (precedes NiObjectNET)
   readObjectNet(r, header);
-  r.u32(); // shader flags 1
-  r.u32(); // shader flags 2
+  material.flags1 = r.u32();
+  material.flags2 = r.u32();
   r.skip(16); // UV offset + UV scale
   const textureSetRef = r.i32();
 
-  if (typeOf(header, textureSetRef) !== 'BSShaderTextureSet') {
-    return { diffuseTexture: null, isEffectShader: false };
+  // Skyrim LE/SE fields after the texture set; FO4+ differs, keep defaults there.
+  if (header.bsVersion <= 100) {
+    try {
+      material.emissive = [r.f32(), r.f32(), r.f32()];
+      material.emissiveMultiple = r.f32();
+      r.u32(); // texture clamp mode
+      material.alpha = r.f32();
+    } catch {
+      /* truncated block: keep defaults */
+    }
   }
-  const tr = blockReader(bytes, header, textureSetRef);
-  const count = tr.u32();
-  const diffuse = count > 0 ? tr.sizedString() : '';
-  return { diffuseTexture: normalizeTexturePath(diffuse), isEffectShader: false };
+  material.useVertexColors = (material.flags2 & SLSF2_VERTEX_COLORS) !== 0;
+  material.useVertexAlpha = (material.flags1 & SLSF1_VERTEX_ALPHA) !== 0;
+
+  if (typeOf(header, textureSetRef) === 'BSShaderTextureSet') {
+    const tr = blockReader(bytes, header, textureSetRef);
+    const count = Math.min(tr.u32(), 10);
+    for (let i = 0; i < count; i++) material.textures.push(normalizeTexturePath(tr.sizedString()) ?? '');
+  }
+
+  // Multi-layer parallax (ice, some glass and gems): the colour sits in the
+  // inner layer texture when the outer one is a plain shell.
+  let diffuse = material.textures[0] || null;
+  if (material.shaderType === SHADER_TYPE_MULTI_LAYER_PARALLAX && material.textures[6]) {
+    diffuse = material.textures[6];
+  }
+  return { diffuseTexture: diffuse, isEffectShader: false, material };
+}
+
+/**
+ * BSEffectShaderProperty (Skyrim layout): glows, liquids, glass and other
+ * self-lit surfaces. Colour = source texture × emissive colour × multiple.
+ */
+function readEffectShader(bytes: Uint8Array, header: Header, ref: number): ShaderInfo {
+  const material = defaultMaterial('effect');
+  try {
+    const r = blockReader(bytes, header, ref);
+    readObjectNet(r, header);
+    material.flags1 = r.u32();
+    material.flags2 = r.u32();
+    r.skip(16); // UV offset + UV scale
+    const source = normalizeTexturePath(r.sizedString());
+    if (header.bsVersion <= 100) {
+      r.skip(4); // clamp mode, lighting influence, env map min LOD, unused byte
+      r.skip(16); // falloff start/stop angle and opacity
+      const color: [number, number, number] = [r.f32(), r.f32(), r.f32()];
+      const alpha = r.f32();
+      material.emissive = color;
+      material.alpha = alpha;
+      material.emissiveMultiple = r.f32();
+      r.f32(); // soft falloff depth
+      material.greyscaleTexture = normalizeTexturePath(r.sizedString());
+    }
+    material.textures = source ? [source] : [];
+    material.useVertexColors = (material.flags2 & SLSF2_VERTEX_COLORS) !== 0;
+    material.useVertexAlpha = (material.flags1 & SLSF1_VERTEX_ALPHA) !== 0;
+    return { diffuseTexture: source, isEffectShader: true, material };
+  } catch {
+    return { diffuseTexture: null, isEffectShader: true, material };
+  }
+}
+
+/** Shader flags worth showing in diagnostics. */
+export function describeMaterialFlags(m: NifMaterial): string[] {
+  const out: string[] = [];
+  if (m.useVertexColors) out.push('vertex colours');
+  if (m.useVertexAlpha) out.push('vertex alpha');
+  if (m.flags1 & SLSF1_OWN_EMIT) out.push('own emit');
+  if (m.flags2 & SLSF2_GLOW_MAP) out.push('glow map');
+  if (m.flags1 & SLSF1_GREYSCALE_TO_PALETTE_COLOR) out.push('greyscale palette');
+  return out;
 }
 
 interface AlphaInfo {
   test: boolean;
   threshold: number;
   blend: boolean;
+  /** NiAlphaProperty source / destination blend modes (0..10). */
+  srcBlend: number;
+  dstBlend: number;
 }
 
 function readAlpha(bytes: Uint8Array, header: Header, ref: number): AlphaInfo {
-  if (typeOf(header, ref) !== 'NiAlphaProperty') return { test: false, threshold: 0, blend: false };
+  if (typeOf(header, ref) !== 'NiAlphaProperty') return { test: false, threshold: 0, blend: false, srcBlend: 6, dstBlend: 7 };
   const r = blockReader(bytes, header, ref);
   readObjectNet(r, header);
   const flags = r.u16();
   const threshold = r.u8();
-  return { test: (flags & ALPHA_FLAG_TEST) !== 0, threshold: threshold / 255, blend: (flags & ALPHA_FLAG_BLEND) !== 0 };
+  return {
+    test: (flags & ALPHA_FLAG_TEST) !== 0,
+    threshold: threshold / 255,
+    blend: (flags & ALPHA_FLAG_BLEND) !== 0,
+    srcBlend: (flags >> 1) & 0xf,
+    dstBlend: (flags >> 5) & 0xf,
+  };
 }
 
 export function normalizeTexturePath(path: string): string | null {
@@ -319,6 +423,7 @@ function readVertexDesc(r: BinaryReader): VertexDesc {
     vertexSize: (lo & 0xf) * 4,
     uvOffset: ((lo >>> 8) & 0xf) * 4,
     normalOffset: ((lo >>> 16) & 0xf) * 4,
+    colorOffset: ((lo >>> 24) & 0xf) * 4,
     flags: hi >>> 12, // bits 44..63
   };
 }
@@ -327,6 +432,8 @@ interface VertexArrays {
   positions: Float32Array;
   normals: Float32Array | null;
   uvs: Float32Array | null;
+  /** RGBA 0..1 per vertex. */
+  colors: Float32Array | null;
 }
 
 function decodeVertices(
@@ -337,12 +444,14 @@ function decodeVertices(
 ): VertexArrays {
   const hasUv = (desc.flags & VA_UV) !== 0;
   const hasNormal = (desc.flags & VA_NORMAL) !== 0;
+  const hasColor = (desc.flags & VA_COLOR) !== 0;
   // SSE vertex data is always full precision; FO4 packs halves unless flagged.
   const halfPositions = bsVersion >= 130 && (desc.flags & VA_FULL_PRECISION) === 0;
 
   const positions = new Float32Array(count * 3);
   const normals = hasNormal ? new Float32Array(count * 3) : null;
   const uvs = hasUv ? new Float32Array(count * 2) : null;
+  const colors = hasColor ? new Float32Array(count * 4) : null;
   const base = r.offset;
 
   for (let i = 0; i < count; i++) {
@@ -371,8 +480,14 @@ function decodeVertices(
       normals[i * 3 + 2] = (r.u8() / 255) * 2 - 1;
     }
   }
+  if (colors) {
+    for (let i = 0; i < count; i++) {
+      r.offset = base + i * desc.vertexSize + desc.colorOffset;
+      for (let c = 0; c < 4; c++) colors[i * 4 + c] = r.u8() / 255;
+    }
+  }
   r.offset = base + count * desc.vertexSize;
-  return { positions, normals, uvs };
+  return { positions, normals, uvs, colors };
 }
 
 function readBsTriShape(
@@ -444,7 +559,6 @@ function readBsTriShape(
   if (!arrays || !indices || indices.length === 0) return null;
 
   const shader = readShader(bytes, header, shaderRef);
-  if (shader.isEffectShader) return null; // glows / decals: not part of the item silhouette
   const alpha = readAlpha(bytes, header, alphaRef);
 
   return finalizeMesh(av, parent, arrays, indices, shader, alpha);
@@ -527,7 +641,6 @@ function readNiGeometry(
   if (!geometry || geometry.indices.length === 0) return null;
 
   const shader = readShader(bytes, header, shaderRef);
-  if (shader.isEffectShader) return null;
   const alpha = readAlpha(bytes, header, alphaRef);
 
   return finalizeMesh(av, parent, geometry.arrays, geometry.indices, shader, alpha);
@@ -561,7 +674,11 @@ function readNiGeometryData(
   }
 
   r.skip(16); // bounding sphere
-  if (r.u8()) r.skip(vertexCount * 16); // vertex colours
+  let colors: Float32Array | null = null;
+  if (r.u8()) {
+    colors = new Float32Array(vertexCount * 4);
+    for (let i = 0; i < colors.length; i++) colors[i] = r.f32();
+  }
 
   let uvs: Float32Array | null = null;
   if (bsVectorFlags & BS_VF_HAS_UV) {
@@ -603,7 +720,7 @@ function readNiGeometryData(
   }
 
   for (const i of indices) if (i >= vertexCount) return null;
-  return { arrays: { positions, normals, uvs }, indices };
+  return { arrays: { positions, normals, uvs, colors }, indices };
 }
 
 // ─── Transforms & output ─────────────────────────────────────────────────
@@ -678,11 +795,20 @@ function finalizeMesh(
     diffuseTexture: shader.diffuseTexture,
     alphaTest: alpha.test,
     alphaThreshold: alpha.threshold,
-    alphaBlend: alpha.blend,
+    // Effect surfaces are see-through by nature even without an alpha property.
+    alphaBlend: alpha.blend || shader.isEffectShader,
+    blendSrc: alpha.srcBlend,
+    blendDst: alpha.dstBlend,
+    colors: arrays.colors,
+    material: shader.material,
+    isEffect: shader.isEffectShader,
   };
 }
 
-function computeBounds(meshes: NifMesh[]): NifBounds | null {
+function computeBounds(all: NifMesh[]): NifBounds | null {
+  // Glows and other effect planes should not change the framing.
+  const solid = all.filter((m) => !m.isEffect);
+  const meshes = solid.length ? solid : all;
   if (meshes.length === 0) return null;
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
   const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];

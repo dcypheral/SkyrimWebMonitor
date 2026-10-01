@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
-const sendCommand = vi.fn();
+type Result = { type: string; id: string; success: boolean; error?: string };
+const sendCommand = vi.fn<(options: unknown, onResult?: (r: Result) => void) => void>();
 vi.mock('@/stores/use-websocket-store/useWebsocketStore', () => ({
-  useWebSocketStore: () => ({ sendCommand }),
+  useWebSocketStore: () => ({ sendCommand, sendQuery: vi.fn() }),
 }));
 
 import { triggerCommand, useHotkeysStore } from '../useHotkeysStore';
@@ -33,9 +34,18 @@ describe('app hotkeys 9-16', () => {
     expect(useHotkeysStore().getSlotForFormId('0xP')).toBe(12);
   });
 
-  it('sends game commands for slots 1-8', () => {
-    useHotkeysStore().bind(3, potion);
-    expect(sendCommand).toHaveBeenCalledWith({ command: 'hotkey_set', formId: '0xP', slot: 3 });
+  it('sends game commands for slots 1-8 and shows the change at once', () => {
+    const store = useHotkeysStore();
+    store.bind(3, potion);
+    expect(sendCommand.mock.calls[0][0]).toEqual({ command: 'hotkey_set', formId: '0xP', slot: 3 });
+    expect(store.getSlotForFormId('0xP')).toBe(3);
+  });
+
+  it('undoes a native change the game refused', () => {
+    const store = useHotkeysStore();
+    store.bind(4, potion);
+    sendCommand.mock.calls[0][1]?.({ type: 'commandResult', id: 'x', success: false, error: 'Item not in inventory' });
+    expect(store.getSlotForFormId('0xP')).toBeNull();
   });
 
   it('moves a form between slots and toggles off on the same slot', () => {

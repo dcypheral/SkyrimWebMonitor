@@ -52,8 +52,18 @@
             <span class="viewer__details-name">{{ d.name || `#${i + 1}` }}</span>
             <span>{{ d.texture ?? t('shared.ui.viewer.noTexture') }}</span>
             <span :class="{ 'viewer__details-bad': d.state !== 'ok' && d.state !== '' }">
-              {{ d.state === 'ok' ? t('shared.ui.viewer.textureOk') : d.state }}{{ d.blend ? ' · blend' : '' }}{{ d.test ? ' · cut-out' : '' }}
+              {{ d.state === 'ok' ? t('shared.ui.viewer.textureOk') : d.state }}
             </span>
+            <span class="viewer__details-meta">{{ d.meta }}</span>
+          </li>
+          <li>
+            <button
+              type="button"
+              class="btn viewer__copy"
+              @click="copyDetails"
+            >
+              {{ copied ? t('shared.ui.viewer.copied') : t('shared.ui.viewer.copy') }}
+            </button>
           </li>
         </ul>
 
@@ -79,7 +89,7 @@ import { nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { base64ToBytes } from '@/shared/lib/gfx';
 import { getItemMaterial } from '@/shared/lib/constants/itemMaterials';
-import { NifViewer, parseNif, type ThumbnailTextureSource } from '@/shared/lib/nif';
+import { NifViewer, describeMaterialFlags, parseNif, type NifMesh, type ThumbnailTextureSource } from '@/shared/lib/nif';
 import { useSystemStore } from '@/stores/system/useSystemStore';
 import { FEATURES } from '@/stores/system/lib/types';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
@@ -97,8 +107,22 @@ const system = useSystemStore();
 const canvas = ref<HTMLCanvasElement | null>(null);
 const status = ref('');
 /** Per-mesh texture diagnostics ("i" button): why a model looks untextured. */
-const details = ref<Array<{ name: string; texture: string | null; state: string; blend: boolean; test: boolean }>>([]);
+const details = ref<Array<{ name: string; texture: string | null; state: string; meta: string }>>([]);
 const showDetails = ref(false);
+const copied = ref(false);
+let modelPathForDetails = '';
+
+/** Copies the diagnostics as text, to paste into a bug report. */
+async function copyDetails(): Promise<void> {
+  const lines = [`model: ${modelPathForDetails}`, ...details.value.map((d, i) => `${i + 1}. ${d.name} | ${d.texture ?? '-'} | ${d.state || '-'} | ${d.meta}`)];
+  try {
+    await navigator.clipboard.writeText(lines.join('\n'));
+    copied.value = true;
+    setTimeout(() => (copied.value = false), 2000);
+  } catch {
+    /* clipboard not available */
+  }
+}
 let viewer: NifViewer | null = null;
 let loadToken = 0;
 
@@ -143,12 +167,12 @@ async function load(request: ModelViewerRequest): Promise<void> {
       );
     }
     if (token !== loadToken || !viewer) return;
+    modelPathForDetails = request.modelPath;
     details.value = model.meshes.map((m) => ({
       name: m.name,
       texture: m.diffuseTexture,
       state: m.diffuseTexture ? (textureState.get(m.diffuseTexture) ?? t('shared.ui.viewer.notLoaded')) : '',
-      blend: m.alphaBlend,
-      test: m.alphaTest,
+      meta: describeMesh(m),
     }));
     const tint = getItemMaterial(request.keywords).rgb;
     const ok = viewer.setModel(model, { textures, tint, framing: request.framing });
@@ -156,6 +180,35 @@ async function load(request: ModelViewerRequest): Promise<void> {
   } catch (err) {
     if (token === loadToken) status.value = t('shared.ui.viewer.failed', { reason: err instanceof Error ? err.message : String(err) });
   }
+}
+
+/** Shader and blending facts that decide how a surface looks. */
+function describeMesh(m: NifMesh): string {
+  const mat = m.material;
+  const parts: string[] = [m.isEffect ? 'effect' : `${mat.kind} type ${mat.shaderType}`];
+  if (m.alphaBlend) parts.push(`blend ${m.blendSrc}/${m.blendDst}`);
+  if (m.alphaTest) parts.push('cut-out');
+  if (mat.alpha !== 1) parts.push(`alpha ${mat.alpha.toFixed(2)}`);
+  parts.push(...describeMaterialFlags(mat));
+  if (m.colors) {
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    const n = m.colors.length / 4;
+    for (let i = 0; i < m.colors.length; i += 4) {
+      r += m.colors[i];
+      g += m.colors[i + 1];
+      b += m.colors[i + 2];
+    }
+    parts.push(`vcol avg ${(r / n).toFixed(2)},${(g / n).toFixed(2)},${(b / n).toFixed(2)}`);
+  }
+  if (mat.emissiveMultiple > 0 && (mat.emissive[0] || mat.emissive[1] || mat.emissive[2])) {
+    parts.push(`emit ${mat.emissive.map((c) => c.toFixed(2)).join(',')} ×${mat.emissiveMultiple.toFixed(1)}`);
+  }
+  const slots = mat.textures.map((p, i) => (p && i > 0 ? `t${i}:${p.split('/').pop() ?? ''}` : '')).filter(Boolean);
+  if (slots.length) parts.push(slots.join(' '));
+  if (mat.greyscaleTexture) parts.push(`palette:${mat.greyscaleTexture.split('/').pop() ?? ''}`);
+  return parts.join(' · ');
 }
 
 watch(current, (request) => {
@@ -336,6 +389,16 @@ onBeforeUnmount(() => viewer?.dispose());
 
 .viewer__details-name {
   color: var(--skyrim-text-primary);
+}
+
+.viewer__details-meta {
+  color: var(--skyrim-text-dim);
+}
+
+.viewer__copy {
+  min-height: 30px;
+  margin-top: 4px;
+  font-size: 0.66rem;
 }
 
 .viewer__details-bad {

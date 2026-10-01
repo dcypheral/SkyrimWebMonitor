@@ -13,10 +13,9 @@
         :img-natural-h="imgNaturalH"
         :scale="markerScale"
         :cover-scale="coverScale"
-        :overlay-style="overlayStyle"
+        :overlay-style="OVERLAY_STYLE"
         :project-world-to-image="projectWorldToImage"
         :current-worldspace="currentMapWorldspace"
-        :class="{ 'map-overlay--moving': isMoving }"
       />
       <!-- Torn paper edge, drawn once on top instead of masking the moving map. -->
       <div
@@ -126,12 +125,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch, type StyleValue } from 'vue';
+import 'leaflet/dist/leaflet.css';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type StyleValue } from 'vue';
 import { storeToRefs } from 'pinia';
-import OpenSeadragon from 'openseadragon';
 import {
+  loadDziInfo,
   prefetchMapTiles,
-  mapTileBlobs,
+  mapTileBlobUrls,
   mapTilesPrefetchActive,
   mapTilesPrefetchProgress,
 } from '../preloadMap';
@@ -142,11 +142,11 @@ import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
 import { i18n } from '@/i18n';
 import { getMapConfig } from '../config/mapRegistry';
 import type { MapConfig } from '../config/lib/types';
-import { currentZoom } from '@/shared/lib/composables/useAppZoom';
 import { logger } from '@/shared/lib/utils/logger';
 import { journeyLayers } from '@/shared/lib/settings/journeyLayers';
 import { mapFocusRequest } from '@/stores/journey/mapFocus';
 import { useJourneyStore } from '@/stores/journey/useJourneyStore';
+import { DziLeafletMap } from '../lib/dziLeafletMap';
 
 // =============================================================
 // Map view configuration
@@ -161,23 +161,26 @@ vips dzsave public/maps/<name>.png public/map-dzi/<name> \
   --overlap 1 \
   --suffix '.webp[Q=80]'
 */
-/** Initial zoom factor relative to the "cover" home zoom. */
+/** Initial zoom factor relative to the "cover" zoom. */
 const INITIAL_ZOOM_FACTOR = 2.5;
 /**
  * Deepest zoom: screen pixels per map image pixel. Past 1 the tiles are
  * upscaled (softer), which is fine for reading paths and pins up close.
  */
 const MAX_ZOOM_PIXEL_RATIO = 4;
-/** Zoom step of the +/− buttons. */
+/** Zoom step of the +/− buttons (factor). */
 const ZOOM_BUTTON_STEP = 1.8;
-/** Zoom used when jumping to a note ("Show on map"). */
+/** Zoom used when jumping to a note ("Show on map"), relative to cover. */
 const FOCUS_ZOOM_FACTOR = 8;
 /** Background color around the map. */
 const BACKGROUND_COLOR = 'var(--skyrim-bg-medium)';
-const MAX_MAP_PIXEL_DENSITY = 2;
+/** Leaflet positions the marker SVG itself; Vue must not set its style. */
+const OVERLAY_STYLE: StyleValue = {};
+/** Wait this long after a zoom before re-laying out the markers. */
+const MARKER_RELAYOUT_DELAY_MS = 120;
 
 // =============================================================
-// Torn-paper edge effect (unchanged)
+// Torn-paper edge effect
 // =============================================================
 
 const TEAR_VIEWBOX = 400;
@@ -211,25 +214,11 @@ const imgNaturalW = ref(0);
 const imgNaturalH = ref(0);
 
 /**
- * Current absolute scale (CSS px per natural image px) and translate of the
- * image inside the viewport. Synced from OSD on every viewport update so the
- * marker SVG overlay can mirror the image transform exactly.
- */
-const scale = ref(0);
-/**
- * Scale the markers are sized for. During a zoom animation the overlay just
- * scales with the map (CSS transform) and markers are re-laid out once the
- * animation ends; re-rendering every marker on every frame of a pinch made
- * frames drop and markers flicker.
+ * CSS px per image px the markers are sized for. Updated when a zoom or
+ * move settles; during a pinch the whole marker layer scales with the map.
  */
 const markerScale = ref(0);
-let isAnimating = false;
-/** True during OSD animations (pans, flings, zooms). */
-const isMoving = ref(false);
-const translateX = ref(0);
-const translateY = ref(0);
-const containerWidth = ref(0);
-const containerHeight = ref(0);
+const coverScale = ref(1);
 const isFollowPlayerMode = ref(false);
 
 const playerStore = useMapPlayerStore();
@@ -244,16 +233,10 @@ const mapConfig = computed<MapConfig>(() =>
   getMapConfig(currentWorldspace.value, i18n.global.locale.value),
 );
 
-/**
- * The effective worldspace of the currently displayed map.
- * Always matches the map config's worldspace (never null).
- */
+/** The effective worldspace of the displayed map (never null). */
 const currentMapWorldspace = computed<string>(() => mapConfig.value.worldspace);
 
-/**
- * Per-map projection engine. Re-created when the map config changes
- * (i.e. when the player crosses a worldspace boundary).
- */
+/** Per-map projection engine, re-created when the map config changes. */
 const projection = computed(() => useMapProjection(mapConfig.value));
 const projectWorldToImage = computed<MapProjectionFn>(() => projection.value.projectWorldToImage);
 
@@ -262,106 +245,46 @@ const isPrefetching = mapTilesPrefetchActive;
 /** 0..100 — how many tiles have been cached so far. */
 const prefetchProgress = mapTilesPrefetchProgress;
 
-const overlayStyle = computed<StyleValue>(() => ({
-  width: `${imgNaturalW.value}px`,
-  height: `${imgNaturalH.value}px`,
-  transform: `translate3d(${translateX.value}px, ${translateY.value}px, 0) scale(${scale.value})`,
-  transformOrigin: '0 0',
-}));
-
-const coverScale = computed(() => {
-  if (!containerWidth.value || !containerHeight.value || !imgNaturalW.value || !imgNaturalH.value) {
-    return 1;
-  }
-  return Math.max(
-    containerWidth.value / imgNaturalW.value,
-    containerHeight.value / imgNaturalH.value
-  );
-});
-
 // =============================================================
-// OpenSeadragon viewer
+// Map engine
 // =============================================================
 
-let viewer: OpenSeadragon.Viewer | null = null;
+let view: DziLeafletMap | null = null;
+let setupToken = 0;
 
-type OsdTileSource = NonNullable<OpenSeadragon.Options['tileSources']>;
+let relayoutTimer: ReturnType<typeof setTimeout> | null = null;
 
-async function detectTileSource(config: MapConfig): Promise<OsdTileSource> {
-  // Always prefer DZI. The app precaches `map-dzi/**` for offline mode and
-  // a HEAD probe can fail against cache-only responses on some mobile PWAs.
-  // Using the DZI URL directly keeps map startup deterministic offline.
-  return config.dziUrl;
-}
-
-function syncOverlayTransform(): void {
-  if (!viewer || !imgNaturalW.value) return;
-  const item = viewer.world.getItemAt(0);
-  if (!item) return;
-
-  // Project the image's (0,0) and (W,0) onto the viewer's CSS pixel space to
-  // recover the affine transform (uniform scale + translate).
-  const p0v = item.imageToViewportCoordinates(0, 0, true);
-  const pXv = item.imageToViewportCoordinates(imgNaturalW.value, 0, true);
-  const p0 = viewer.viewport.pixelFromPoint(p0v, true);
-  const pX = viewer.viewport.pixelFromPoint(pXv, true);
-
-  const s = (pX.x - p0.x) / imgNaturalW.value;
-  if (s > 0 && Number.isFinite(s)) {
-    if (Math.abs(scale.value - s) > 1e-6) {
-      scale.value = s;
-    }
-    if (!isAnimating || markerScale.value === 0) settleMarkerScale();
-    if (Math.abs(translateX.value - p0.x) > 1e-3) {
-      translateX.value = p0.x;
-    }
-    if (Math.abs(translateY.value - p0.y) > 1e-3) {
-      translateY.value = p0.y;
-    }
+/**
+ * Re-lays out the markers for the new zoom. Debounced: during repeated
+ * zooms (button taps, a long pinch) the marker layer simply scales with the
+ * map and is laid out once at the end — that re-layout is the only costly
+ * step of a zoom.
+ */
+function onViewChange(scale: number): void {
+  if (!view) return;
+  const cover = view.coverScale();
+  if (Math.abs(coverScale.value - cover) > 1e-9) coverScale.value = cover;
+  if (Math.abs(markerScale.value - scale) <= 1e-9) return;
+  if (markerScale.value === 0) {
+    markerScale.value = scale;
+    return;
   }
+  if (relayoutTimer) clearTimeout(relayoutTimer);
+  relayoutTimer = setTimeout(() => {
+    relayoutTimer = null;
+    if (view) markerScale.value = view.scale();
+  }, MARKER_RELAYOUT_DELAY_MS);
 }
 
-function settleMarkerScale(): void {
-  if (Math.abs(markerScale.value - scale.value) > 1e-6) markerScale.value = scale.value;
-}
-
-function syncContainerSize(): void {
-  const cont = osdContainerRef.value;
-  if (!cont) return;
-  const w = cont.clientWidth;
-  const h = cont.clientHeight;
-  if (containerWidth.value !== w) {
-    containerWidth.value = w;
-  }
-  if (containerHeight.value !== h) {
-    containerHeight.value = h;
-  }
-}
-
-function logImagePxAt(imgX: number, imgY: number): void {
-  logger.log(`[map] image px: { x: ${imgX.toFixed(2)}, y: ${imgY.toFixed(2)} }`);
-}
-
-function centerOnPlayer(immediately = true): void {
-  if (!viewer || !isFollowPlayerMode.value) return;
+function playerImagePoint(): { x: number; y: number } | null {
   const dp = displayPosition.value;
-  if (!dp) return;
-  const projected = projectWorldToImage.value(dp);
-  if (!projected) return;
-  const item = viewer.world.getItemAt(0);
-  if (!item) return;
+  return dp ? projectWorldToImage.value(dp) : null;
+}
 
-  const targetCenter = item.imageToViewportCoordinates(projected.x, projected.y, true);
-  const currentCenter = viewer.viewport.getCenter(true);
-  const dx = targetCenter.x - currentCenter.x;
-  const dy = targetCenter.y - currentCenter.y;
-  if (dx * dx + dy * dy < 1e-10) return;
-
-  viewer.viewport.panTo(targetCenter, immediately);
-  // Keep OSD constraints in charge near edges: when the player is close to a
-  // border we prefer clamped panning over exposing off-map areas.
-  viewer.viewport.applyConstraints(true);
-  syncOverlayTransform();
+function centerOnPlayer(animate = true): void {
+  if (!view || !isFollowPlayerMode.value) return;
+  const p = playerImagePoint();
+  if (p) view.panTo(p.x, p.y, animate);
 }
 
 function stopFollowPlayerByUser(): void {
@@ -371,151 +294,33 @@ function stopFollowPlayerByUser(): void {
 
 function toggleFollowPlayerMode(): void {
   isFollowPlayerMode.value = !isFollowPlayerMode.value;
-  if (isFollowPlayerMode.value) {
-    centerOnPlayer(true);
-  }
-}
-
-/**
- * Patch OSD's source so it serves DZI tiles from the shared blob-URL cache
- * populated by `prefetchMapTiles()` (kicked off at app start by
- * `useAppLoader`). Falls back to the original network URL for tiles that
- * are not cached yet, so the viewer is fully usable while the background
- * prefetch is still running.
- *
- * After the prefetch completes, the browser never re-hits the network for
- * tiles regardless of the server's Cache-Control headers, and OSD's
- * internal tile-cache evictions don't cost a thing because re-loading from
- * a blob URL is instant.
- */
-let densityCapped = false;
-
-/** OSD reads the density once and again on window resize; clamp both. */
-function capOsdPixelDensity(): void {
-  if (densityCapped) return;
-  const original: unknown = Reflect.get(OpenSeadragon, 'getCurrentPixelDensityRatio');
-  if (typeof original !== 'function') return;
-  const capped = (): number => {
-    const value: unknown = Reflect.apply(original, OpenSeadragon, []);
-    return Math.min(typeof value === 'number' ? value : 1, MAX_MAP_PIXEL_DENSITY);
-  };
-  Reflect.set(OpenSeadragon, 'getCurrentPixelDensityRatio', capped);
-  Reflect.set(OpenSeadragon, 'pixelDensityRatio', capped());
-  densityCapped = true;
-}
-
-/** The part of OpenSeadragon's ImageJob that the tile loader uses. */
-interface TileJob {
-  src: string;
-  finish: (data: unknown, request: unknown, dataType: string) => void;
-}
-
-function attachSharedTileCache(item: OpenSeadragon.TiledImage): void {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  const source = item.source as OpenSeadragon.TileSource & {
-    getTileUrl?: (_level: number, _x: number, _y: number) => string | (() => string);
-  };
-
-  if (typeof source.getTileUrl !== 'function') {
-    return; // Single-image source has no tile pyramid.
-  }
-
-  const originalGetTileUrl = source.getTileUrl.bind(source);
-  source.getTileUrl = (level: number, x: number, y: number): string => {
-    const raw = originalGetTileUrl(level, x, y);
-    return typeof raw === 'function' ? raw() : raw;
-  };
-
-  // Cached tiles go to OpenSeadragon as raw Blobs ("rasterBlob"): it then
-  // decodes them with createImageBitmap, off the main thread. Loading them
-  // as <img> decoded each 512 px tile on the main thread during pans.
-  const originalDownload: unknown = Reflect.get(source, 'downloadTileStart');
-  if (typeof originalDownload === 'function') {
-    const fallback = (job: TileJob): void => {
-      Reflect.apply(originalDownload, source, [job]);
-    };
-    Reflect.set(source, 'downloadTileStart', (job: TileJob) => {
-      const blob = mapTileBlobs.get(job.src);
-      if (blob) job.finish(blob, null, 'rasterBlob');
-      else fallback(job);
-    });
-  }
-
-  // Make sure the background prefetch is running. Idempotent: a no-op if it
-  // was already started by useAppLoader.
-  void prefetchMapTiles(mapConfig.value.dziUrl);
-}
-
-function applyHomeBounds(): void {
-  if (!viewer) return;
-  // Clamp current zoom to a sane initial level relative to home (cover).
-  const home = viewer.viewport.getHomeZoom();
-  const target = home * INITIAL_ZOOM_FACTOR;
-  viewer.viewport.zoomTo(target, undefined, true);
-  viewer.viewport.applyConstraints(true);
-  syncOverlayTransform();
-}
-
-/**
- * Let the player zoom out until the whole map fits (the default minimum is
- * "cover", which always crops part of the map on non-square screens).
- */
-function allowZoomOutToFit(): void {
-  if (!viewer || !imgNaturalW.value) return;
-  const cw = containerWidth.value;
-  const ch = containerHeight.value;
-  if (!cw || !ch) return;
-  const config = mapConfig.value;
-  const croppedW = imgNaturalW.value - 2 * config.cropX;
-  const croppedH = imgNaturalH.value - config.cropYTop - config.cropYBottom;
-  if (croppedW <= 0 || croppedH <= 0) return;
-  // The cropped map spans 1 viewport unit in width (see the 'open' handler):
-  // at zoom z the screen shows 1/z units across.
-  const fitZoom = Math.min(1, (ch / cw) * (croppedW / croppedH));
-  // `minZoomLevel` is a documented Viewport field missing from the typings.
-  Reflect.set(viewer.viewport, 'minZoomLevel', fitZoom);
+  if (isFollowPlayerMode.value) centerOnPlayer(true);
 }
 
 function zoomBy(factor: number): void {
-  if (!viewer) return;
+  if (!view) return;
   stopFollowPlayerByUser();
-  viewer.viewport.zoomBy(factor);
-  viewer.viewport.applyConstraints();
+  view.zoomBy(Math.log2(factor));
 }
 
 /** Center on world coordinates and zoom in (note "Show on map"). */
 function focusWorldPoint(x: number, y: number): boolean {
-  if (!viewer) return false;
-  const item = viewer.world.getItemAt(0);
-  if (!item) return false;
+  if (!view) return false;
   const p = projectWorldToImage.value({ x, y });
   if (!p) return false;
   isFollowPlayerMode.value = false;
-  const target = item.imageToViewportCoordinates(p.x, p.y, true);
-  viewer.viewport.zoomTo(viewer.viewport.getHomeZoom() * FOCUS_ZOOM_FACTOR, undefined, true);
-  viewer.viewport.panTo(target, true);
-  viewer.viewport.applyConstraints(true);
-  syncOverlayTransform();
+  view.setView(p.x, p.y, view.coverScale() * FOCUS_ZOOM_FACTOR);
   return true;
 }
 
 /** Zoom to show a whole session's path. */
 function fitSession(sessionId: number): boolean {
-  if (!viewer) return false;
-  const item = viewer.world.getItemAt(0);
+  if (!view) return false;
   const box = markersRef.value?.sessionBounds(sessionId);
-  if (!item || !box) return false;
+  if (!box) return false;
   isFollowPlayerMode.value = false;
   const pad = Math.max(box.maxX - box.minX, box.maxY - box.minY) * 0.15 + 40;
-  const rect = item.imageToViewportRectangle(
-    box.minX - pad,
-    box.minY - pad,
-    box.maxX - box.minX + 2 * pad,
-    box.maxY - box.minY + 2 * pad,
-  );
-  viewer.viewport.fitBounds(rect, true);
-  viewer.viewport.applyConstraints(true);
-  syncOverlayTransform();
+  view.fitImageRect(box.minX - pad, box.minY - pad, box.maxX + pad, box.maxY + pad);
   return true;
 }
 
@@ -548,189 +353,58 @@ const focusSessionLabel = computed(() => {
 });
 
 async function setupViewer(): Promise<void> {
+  const token = ++setupToken;
   const host = osdContainerRef.value;
   if (!host) return;
-
   const config = mapConfig.value;
-  const tileSources = await detectTileSource(config);
+  const info = await loadDziInfo(config.dziUrl);
+  if (!info || token !== setupToken || !osdContainerRef.value) return;
 
-  // Draw the map at most at 2 device pixels per CSS pixel. The handheld's
-  // 2.6× screen otherwise makes every frame fill ~70 % more pixels for a
-  // difference that is hard to see on a map texture.
-  capOsdPixelDensity();
+  void prefetchMapTiles(config.dziUrl);
 
-  viewer = OpenSeadragon({
-    // 2D canvas drawer. OSD's default WebGL drawer renders into its own GL
-    // canvas and copies every frame into a 2D canvas; on mobile WebViews
-    // that copy stalls and tiles flash while panning. Measured with the
-    // same pan/zoom script in a software-GL test browser: median frame
-    // 167 ms (WebGL) vs 33 ms (canvas).
-    drawer: 'canvas',
-    element: host,
-    tileSources,
-    prefixUrl: '',
-    showNavigator: false,
-    showNavigationControl: false,
-    showSequenceControl: false,
-    showFullPageControl: false,
-    showHomeControl: false,
-    showZoomControl: false,
-    showRotationControl: false,
-    // Always cover viewport: home zoom fills, and we forbid any zoom-out below it.
-    homeFillsViewer: true,
-    visibilityRatio: 1.0,
-    constrainDuringPan: true,
-    minZoomImageRatio: 3,
-    maxZoomPixelRatio: MAX_ZOOM_PIXEL_RATIO,
-    animationTime: 0.3,
-    springStiffness: 1,
-    // false = OSD keeps the previous LOD visible until the next one is fully
-    // loaded. With `true` it would clear and re-render immediately, exposing
-    // the placeholderFillStyle as a visible flash during fast zoom-out.
-    immediateRender: false,
-    preserveImageSizeOnResize: true,
-    blendTime: 0,
-    alwaysBlend: false,
-    // Used only as the very last resort when no tile of any LOD is available.
-    placeholderFillStyle: BACKGROUND_COLOR,
-    // Load lower-res tiles a bit earlier so during a fast zoom there is
-    // always *something* sharp-ish to show before the target LOD arrives.
-    minPixelRatio: 0.5,
-    // Larger cache + more parallel network slots = far less popping during
-    // rapid zoom/pan. Numbers are conservative; tune up if memory allows.
-    imageLoaderLimit: 8,
-    maxImageCacheCount: 2048,
-    // Pre-fetch tiles around the current viewport so panning/zooming has
-    // them ready instead of starting a request only when they enter view.
-    preload: true,
-    // Avoid sub-pixel half-transparent seams between adjacent tiles.
-    /* eslint-disable @typescript-eslint/consistent-type-assertions */
-    subPixelRoundingForTransparency:
-      OpenSeadragon.SUBPIXEL_ROUNDING_OCCURRENCES.ALWAYS as unknown as object,
-    /* eslint-enable @typescript-eslint/consistent-type-assertions */
-    smoothTileEdgesMinZoom: Infinity,
-    gestureSettingsMouse: {
-      clickToZoom: false,
-      dblClickToZoom: false,
-      flickEnabled: true,
-      scrollToZoom: true,
-      pinchToZoom: true,
-      dragToPan: true,
+  view = new DziLeafletMap(host, {
+    info,
+    crop: { cropX: config.cropX, cropYTop: config.cropYTop, cropYBottom: config.cropYBottom },
+    resolveTileUrl: (url) => mapTileBlobUrls.get(url) ?? url,
+    maxPixelRatio: MAX_ZOOM_PIXEL_RATIO,
+    onClick: (x, y) => {
+      // First let the marker overlay try to handle the tap (selection /
+      // fast-travel). Only deselect when the tap landed on empty map area.
+      const hit = markersRef.value?.handleClickAt(x, y) ?? false;
+      if (!hit) markersRef.value?.clearSelection();
+      logger.log(`[map] image px: { x: ${x.toFixed(2)}, y: ${y.toFixed(2)} }`);
     },
-    gestureSettingsTouch: {
-      clickToZoom: false,
-      dblClickToZoom: false,
-      flickEnabled: true,
-      scrollToZoom: false,
-      pinchToZoom: true,
-      dragToPan: true,
-    },
-    gestureSettingsPen: {
-      clickToZoom: false,
-      dblClickToZoom: false,
-      flickEnabled: true,
-      pinchToZoom: true,
-      dragToPan: true,
-    },
+    onViewChange,
+    onUserGesture: stopFollowPlayerByUser,
   });
 
-  viewer.addHandler('open', () => {
-    if (!viewer) return;
-    const item = viewer.world.getItemAt(0);
-    if (!item) return;
-    const size = item.getContentSize();
-    imgNaturalW.value = size.x;
-    imgNaturalH.value = size.y;
+  // Initial view: centred on the player (or the map), zoomed past "cover".
+  const cover = view.coverScale();
+  const p = playerImagePoint();
+  const cx = p?.x ?? info.width / 2;
+  const cy = p?.y ?? (config.cropYTop + (info.height - config.cropYBottom)) / 2;
+  view.setView(cx, cy, cover * INITIAL_ZOOM_FACTOR);
 
-    // Reposition the item so only the non-dark cropped area is considered
-    // the "world" by OSD. This makes homeFillsViewer, visibilityRatio and
-    // constrainDuringPan all work relative to the cropped region, which
-    // naturally prevents the user from panning into the dark edges.
-    const cropX = config.cropX;
-    const cropYTop = config.cropYTop;
-    const cropYBottom = config.cropYBottom;
-    if (cropX > 0 || cropYTop > 0 || cropYBottom > 0) {
-      const W = size.x;
-      const croppedW = W - 2 * cropX;
-      const croppedH = size.y - cropYTop - cropYBottom;
-      // In OSD viewport space the item default width is 1.0. We scale it so
-      // the cropped region spans exactly 1.0 viewport unit.
-      const newWidth = W / croppedW;
-      item.setWidth(newWidth);
-      item.setPosition(
-        new OpenSeadragon.Point(-cropX / croppedW, -cropYTop / croppedW),
-      );
-      // Also clip rendering so OSD won't bother loading tiles for the dark area.
-      item.setClip(new OpenSeadragon.Rect(cropX, cropYTop, croppedW, croppedH));
-    }
+  imgNaturalW.value = info.width;
+  imgNaturalH.value = info.height;
+  onViewChange(view.scale());
 
-    syncContainerSize();
-    allowZoomOutToFit();
-    applyHomeBounds();
-    attachSharedTileCache(item);
-    centerOnPlayer(true);
-    applyPendingFocus();
-  });
-
-  viewer.addHandler('update-viewport', syncOverlayTransform);
-  viewer.addHandler('animation-start', () => {
-    isAnimating = true;
-    isMoving.value = true;
-  });
-  viewer.addHandler('animation-finish', () => {
-    isAnimating = false;
-    isMoving.value = false;
-    settleMarkerScale();
-  });
-  viewer.addHandler('resize', () => {
-    syncContainerSize();
-    allowZoomOutToFit();
-    syncOverlayTransform();
-    centerOnPlayer(true);
-  });
-
-  // Any explicit user pan/zoom gesture exits follow mode back to free view.
-  viewer.addHandler('canvas-drag', stopFollowPlayerByUser);
-  viewer.addHandler('canvas-scroll', stopFollowPlayerByUser);
-  viewer.addHandler('canvas-pinch', stopFollowPlayerByUser);
-
-  viewer.addHandler('canvas-click', (event) => {
-    if (!viewer) return;
-    if (!event.quick) return;
-    const item = viewer.world.getItemAt(0);
-    if (!item) return;
-    // CSS zoom on .handheld-device causes getBoundingClientRect() to return
-    // zoomed dimensions while clientWidth/clientHeight (used by OSD for
-    // viewport containerSize) stay at layout (unzoomed) size. OSD computes
-    // event.position from getBoundingClientRect (zoomed space) but
-    // pointFromPixel maps against containerSize (unzoomed space). Divide by
-    // currentZoom to bring the position into the same coordinate space.
-    const z = currentZoom.value;
-    const pos = z !== 1 ? event.position.divide(z) : event.position;
-    const viewportPoint = viewer.viewport.pointFromPixel(pos);
-    const imgPoint = item.viewportToImageCoordinates(viewportPoint);
-    // First let the marker overlay try to handle the tap (selection /
-    // fast-travel). Only deselect when the tap landed on empty map area.
-    const hit = markersRef.value?.handleClickAt(imgPoint.x, imgPoint.y) ?? false;
-    if (!hit) {
-      markersRef.value?.clearSelection();
-    }
-    logImagePxAt(imgPoint.x, imgPoint.y);
-  });
+  // The marker SVG renders once the image size is known; hand it to Leaflet.
+  await nextTick();
+  const svg: unknown = markersRef.value?.$el;
+  if (view && svg instanceof SVGSVGElement) view.attachOverlay(svg);
+  applyPendingFocus();
 }
 
 function destroyViewer(): void {
-  if (viewer) {
-    viewer.destroy();
-    viewer = null;
-  }
+  setupToken++;
+  if (relayoutTimer) clearTimeout(relayoutTimer);
+  relayoutTimer = null;
+  view?.destroy();
+  view = null;
   imgNaturalW.value = 0;
   imgNaturalH.value = 0;
-  scale.value = 0;
   markerScale.value = 0;
-  isAnimating = false;
-  translateX.value = 0;
-  translateY.value = 0;
 }
 
 // =============================================================
@@ -755,10 +429,8 @@ watch(
 );
 
 /**
- * When the player crosses a worldspace boundary, destroy the current
- * viewer and create a new one for the target map. Also sync the
- * effective map worldspace to the player store so position-renderability
- * checks use the correct worldspace.
+ * When the player crosses a worldspace boundary, rebuild the map for the
+ * new world.
  */
 watch(currentWorldspace, (next, prev) => {
   if (next !== prev) {
@@ -768,24 +440,12 @@ watch(currentWorldspace, (next, prev) => {
 });
 
 /**
- * Keep the player store's currentMapWorldspace in sync with the
- * active map config. This ensures isLivePositionRenderable and
- * displayPosition use the correct worldspace for position checks.
+ * Keep the player store's currentMapWorldspace in sync with the active map
+ * config, so position-renderability checks use the right worldspace.
  */
 watch(mapConfig, (config) => {
   playerStore.setCurrentMapWorldspace(config.worldspace);
 }, { immediate: true });
-
-/**
- * When the app zoom changes, .handheld-device height is adjusted to
- * (100/z)vh which changes the layout size of the OSD container. Force
- * OSD to re-read its container dimensions and sync the overlay.
- */
-watch(currentZoom, () => {
-  syncContainerSize();
-  syncOverlayTransform();
-  centerOnPlayer(true);
-});
 
 onBeforeUnmount(() => {
   destroyViewer();
@@ -818,6 +478,11 @@ onBeforeUnmount(() => {
 .osd-host {
   position: absolute;
   inset: 0;
+
+  /* Own stacking context: Leaflet's panes use z-index 200–700 and would
+     otherwise cover the frame and the controls. */
+  z-index: 0;
+  isolation: isolate;
 }
 
 /*
@@ -843,10 +508,15 @@ onBeforeUnmount(() => {
   filter: drop-shadow(0 0 5px rgb(0 0 0 / 60%));
 }
 
-/* While the map moves, keep the marker layer's raster instead of
-   re-rasterizing the full-map SVG at every intermediate zoom. */
-.map-overlay--moving {
-  will-change: transform;
+/* Leaflet container: no default grey, no tap highlight. */
+.osd-host :deep(.leaflet-container),
+.osd-host.leaflet-container {
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.osd-host :deep(.map-svg-overlay) {
+  pointer-events: none;
 }
 
 .map-overlay {

@@ -17,6 +17,34 @@ export interface NifMesh {
   alphaThreshold: number;
   /** NiAlphaProperty blending: see-through surfaces such as potion glass. */
   alphaBlend: boolean;
+  /** NiAlphaProperty blend modes (0 ONE, 1 ZERO, … 6 SRC_ALPHA, 7 ONE_MINUS_SRC_ALPHA …). */
+  blendSrc: number;
+  blendDst: number;
+  /** RGBA 0..1 per vertex, or null. Used when material.useVertexColors. */
+  colors: Float32Array | null;
+  material: NifMaterial;
+  /** BSEffectShaderProperty surface (glow, liquid, glass). */
+  isEffect: boolean;
+}
+
+/** What the renderer needs from the shader property. */
+export interface NifMaterial {
+  kind: 'lighting' | 'effect' | 'none';
+  /** BSLightingShaderProperty shader type (0 default, 1 env map, 11 multi-layer parallax, …). */
+  shaderType: number;
+  flags1: number;
+  flags2: number;
+  /** Texture set slots (lighting) or [source] (effect); '' = empty slot. */
+  textures: string[];
+  /** Emissive / base colour (effect shaders: the surface colour). */
+  emissive: [number, number, number];
+  emissiveMultiple: number;
+  /** Shader alpha (glass fade). */
+  alpha: number;
+  useVertexColors: boolean;
+  useVertexAlpha: boolean;
+  /** Effect shader palette texture (greyscale-to-palette). */
+  greyscaleTexture: string | null;
 }
 
 /**

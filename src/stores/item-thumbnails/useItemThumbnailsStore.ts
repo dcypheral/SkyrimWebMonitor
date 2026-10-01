@@ -21,7 +21,7 @@ import { generateThumbnail, type ThumbnailJob } from './lib/generateThumbnail';
 import { clearThumbnails, readThumbnail, writeThumbnail } from './lib/thumbnailDb';
 
 /** Bump when the renderer's look changes so old cached images are replaced. */
-export const THUMBNAIL_RENDER_VERSION = 3;
+export const THUMBNAIL_RENDER_VERSION = 4;
 
 export interface ThumbnailSource {
   modelPath?: string | null;

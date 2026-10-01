@@ -602,7 +602,12 @@
         "details": "Model details",
         "noTexture": "no texture",
         "textureOk": "texture loaded",
-        "notLoaded": "not loaded (limit)"
+        "notLoaded": "not loaded (limit)",
+        "copy": "Copy details",
+        "copied": "Copied"
+      },
+      "hotkeys": {
+        "failed": "Hotkey not set: {reason}"
       }
     }
   },

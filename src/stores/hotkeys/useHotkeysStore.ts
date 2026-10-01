@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { SendCommandOptions } from '@/api/websocket';
+import { useToast } from '@/shared/lib/composables/useToast';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import {
   NATIVE_HOTKEY_COUNT,
@@ -172,13 +173,40 @@ export const useHotkeysStore = defineStore('hotkeys', () => {
     saveExtra();
   }
 
+  /** Shows a native slot change at once; the game's answer confirms or undoes it. */
+  function setNativeLocal(slot: number, entry: HotkeySlotEntry): void {
+    slots.value = slots.value.map((e) => (e.slot === slot ? entry : e));
+  }
+
+  /**
+   * Sends a native hotkey change. Optimistic: the slot updates right away.
+   * On success the game's hotkeys are re-read; on failure the old state
+   * comes back and the reason is shown.
+   */
+  function sendNative(options: SendCommandOptions, slot: number, optimistic: HotkeySlotEntry): void {
+    const before = slots.value.find((e) => e.slot === slot) ?? { slot, bound: false };
+    setNativeLocal(slot, optimistic);
+    useWebSocketStore().sendCommand(options, (result) => {
+      if (result.success) {
+        refreshFromGame();
+        return;
+      }
+      setNativeLocal(slot, before);
+      const reason = result.error ?? '';
+      // i18n loads lazily here: this store is also used where i18n is mocked.
+      void import('@/i18n')
+        .then(({ i18n }) => useToast().show(i18n.global.t('shared.ui.hotkeys.failed', { reason }), 'error', 5000))
+        .catch(() => useToast().show(reason, 'error', 5000));
+    });
+  }
+
   /** Bind a form to a slot (1–16). A form lives in one slot at a time. */
   function bind(slot: number, binding: HotkeyBinding): void {
-    const ws = useWebSocketStore();
     const previous = getSlotForFormId(binding.formId);
     if (previous !== null && previous !== slot) unbind(previous);
     if (isNativeHotkeySlot(slot)) {
-      ws.sendCommand({ command: 'hotkey_set', formId: binding.formId, slot });
+      const entry: HotkeySlotEntry = { ...binding, slot, bound: true };
+      sendNative({ command: 'hotkey_set', formId: binding.formId, slot }, slot, entry);
       return;
     }
     if (slot > NATIVE_HOTKEY_COUNT && slot <= TOTAL_HOTKEY_COUNT) {
@@ -189,7 +217,7 @@ export const useHotkeysStore = defineStore('hotkeys', () => {
 
   function unbind(slot: number): void {
     if (isNativeHotkeySlot(slot)) {
-      useWebSocketStore().sendCommand({ command: 'hotkey_clear', slot });
+      sendNative({ command: 'hotkey_clear', slot }, slot, { slot, bound: false });
       return;
     }
     setExtra(slot, { slot, bound: false });

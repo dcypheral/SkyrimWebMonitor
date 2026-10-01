@@ -203,7 +203,8 @@ describe('useWebSocketStore', () => {
       store.sendCommand({ command: 'file_download', path: 'interface/exported/hudmenu.gfx' });
       expect(mockWsClient.command).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ command: 'file_download', path: 'interface/exported/hudmenu.gfx' })
+        expect.objectContaining({ command: 'file_download', path: 'interface/exported/hudmenu.gfx' }),
+        true, // actions respect the canAct gate
       );
     });
   });
