@@ -73,7 +73,7 @@ function loadTexture(
       const preview = await texturePreview(path, TEXTURE_MAX_SIZE);
       return await decodeImage(`data:${preview.mimeType};base64,${preview.imageBase64}`);
     } catch {
-      // Missing or unsupported (e.g. BC7) texture: the mesh falls back to the material tint.
+      // Missing texture, or a format the plugin cannot decode: the mesh falls back to the material tint.
       return null;
     }
   })();

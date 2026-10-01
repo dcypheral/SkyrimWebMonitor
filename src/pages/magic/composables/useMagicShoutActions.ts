@@ -2,7 +2,6 @@ import { ref, computed, watch } from 'vue';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useModal } from '@/shared/lib/composables/useModal';
 import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
-import { DataRouter } from '@/stores/adapters/dataRouter';
 import { HotkeyPickerModal } from '@/shared/ui';
 import type { ShoutItem } from '@/stores/magic/lib/types';
 
@@ -38,24 +37,23 @@ export function useMagicShoutActions(shoutsList: () => ShoutItem[]) {
     if (!activeShout.value || !activeShoutData.value) return;
     const formId = activeShout.value;
     const itemName = activeShoutData.value.name;
+    // Open at once with what the app knows; the refresh updates the grid.
+    hotkeysStore.refreshFromGame();
+    const currentSlot = hotkeysStore.getSlotForFormId(formId);
 
-    wsStore.sendQuery('hotkeys.items', { items: 'Hotkey::Items' }, (fields) => {
-      DataRouter.routeDataById('hotkeys.items', fields);
-      const currentSlot = hotkeysStore.getSlotForFormId(formId);
-
-      openModal({
-        component: HotkeyPickerModal,
-        props: {
-          currentSlot,
-          itemName,
+    openModal({
+      component: HotkeyPickerModal,
+      props: {
+        currentSlot,
+        itemName,
+        formId,
+      },
+      on: {
+        select: (slot: number) => {
+          hotkeysStore.toggle(slot, { kind: 'spell', formId, name: itemName, spellType: 'Shout', school: 'None', cost: 0, level: 0, chargeTime: 0 });
+          closeModal();
         },
-        on: {
-          select: (slot: number) => {
-            hotkeysStore.toggle(slot, { kind: 'spell', formId, name: itemName, spellType: 'Shout', school: 'None', cost: 0, level: 0, chargeTime: 0 });
-            closeModal();
-          },
-        },
-      });
+      },
     });
   }
 

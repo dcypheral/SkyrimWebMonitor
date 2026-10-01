@@ -13,3 +13,4 @@ export { default as GameStatusBackdrop } from './game-status-backdrop/GameStatus
 export { default as CombatIndicator } from './combat-indicator/CombatIndicator.vue';
 export { default as DisplayControls } from './display-controls/DisplayControls.vue';
 export { default as BaseSwitch } from './base-switch/BaseSwitch.vue';
+export { default as AppToast } from './app-toast/AppToast.vue';

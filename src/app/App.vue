@@ -25,6 +25,7 @@
     <game-status-backdrop />
     <combat-indicator />
     <exit-toast :visible="showToast" />
+    <app-toast />
   </div>
 </template>
 
@@ -38,6 +39,7 @@ import {
   ExitToast,
   GameStatusBackdrop,
   CombatIndicator,
+  AppToast,
 } from '@/shared/ui';
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';

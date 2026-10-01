@@ -48,6 +48,7 @@ const VA_FULL_PRECISION = 0x400;
 // NiAVObject flag: hidden.
 const AV_FLAG_HIDDEN = 0x1;
 // NiAlphaProperty flags.
+const ALPHA_FLAG_BLEND = 1;
 const ALPHA_FLAG_TEST = 1 << 9;
 // NiGeometryData BS vector flags.
 const BS_VF_HAS_UV = 0x1;
@@ -284,13 +285,19 @@ function readShader(bytes: Uint8Array, header: Header, ref: number): ShaderInfo 
   return { diffuseTexture: normalizeTexturePath(diffuse), isEffectShader: false };
 }
 
-function readAlpha(bytes: Uint8Array, header: Header, ref: number): { test: boolean; threshold: number } {
-  if (typeOf(header, ref) !== 'NiAlphaProperty') return { test: false, threshold: 0 };
+interface AlphaInfo {
+  test: boolean;
+  threshold: number;
+  blend: boolean;
+}
+
+function readAlpha(bytes: Uint8Array, header: Header, ref: number): AlphaInfo {
+  if (typeOf(header, ref) !== 'NiAlphaProperty') return { test: false, threshold: 0, blend: false };
   const r = blockReader(bytes, header, ref);
   readObjectNet(r, header);
   const flags = r.u16();
   const threshold = r.u8();
-  return { test: (flags & ALPHA_FLAG_TEST) !== 0, threshold: threshold / 255 };
+  return { test: (flags & ALPHA_FLAG_TEST) !== 0, threshold: threshold / 255, blend: (flags & ALPHA_FLAG_BLEND) !== 0 };
 }
 
 export function normalizeTexturePath(path: string): string | null {
@@ -640,7 +647,7 @@ function finalizeMesh(
   arrays: VertexArrays,
   indices: Uint32Array,
   shader: ShaderInfo,
-  alpha: { test: boolean; threshold: number },
+  alpha: AlphaInfo,
 ): NifMesh {
   const world = compose(parent, av.transform);
   const { positions, normals } = arrays;
@@ -671,6 +678,7 @@ function finalizeMesh(
     diffuseTexture: shader.diffuseTexture,
     alphaTest: alpha.test,
     alphaThreshold: alpha.threshold,
+    alphaBlend: alpha.blend,
   };
 }
 

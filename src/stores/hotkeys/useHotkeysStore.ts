@@ -59,6 +59,10 @@ function isBoundEntry(v: unknown): v is HotkeySlotEntry {
   );
 }
 
+function isSlotEntry(v: unknown): v is HotkeySlotEntry {
+  return typeof v === 'object' && v !== null && typeof Reflect.get(v, 'slot') === 'number' && typeof Reflect.get(v, 'bound') === 'boolean';
+}
+
 function loadExtra(): HotkeySlotEntry[] {
   let stored: HotkeySlotEntry[] = [];
   try {
@@ -223,6 +227,16 @@ export const useHotkeysStore = defineStore('hotkeys', () => {
     }
   }
 
+  /**
+   * Re-reads the game's hotkeys (slots 1–8). Uses its own query id so a live
+   * 'hotkeys.items' subscription or a background query cannot take the reply.
+   */
+  function refreshFromGame(): void {
+    useWebSocketStore().sendQuery('hotkeys.items.refresh', { items: 'Hotkey::Items' }, (fields) => {
+      if (Array.isArray(fields.items)) setHotkeys({ items: fields.items.filter(isSlotEntry) });
+    });
+  }
+
   function trigger(entry: HotkeySlotEntry): void {
     const ws = useWebSocketStore();
     for (const command of triggerCommands(entry, handFor(entry))) ws.sendCommand(command);
@@ -239,6 +253,7 @@ export const useHotkeysStore = defineStore('hotkeys', () => {
     unbind,
     toggle,
     trigger,
+    refreshFromGame,
     hands,
     handFor,
     setHands,

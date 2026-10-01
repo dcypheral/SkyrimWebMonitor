@@ -36,6 +36,9 @@ uniform sampler2D uTexture;
 uniform bool uHasTexture;
 uniform vec3 uTint;
 uniform float uAlphaCutoff;
+// < 0: opaque. Otherwise the surface is alpha-blended (glass): texture alpha,
+// or this value for untextured meshes.
+uniform float uOpacity;
 void main() {
   vec4 base = uHasTexture ? texture2D(uTexture, vUv) : vec4(uTint, 1.0);
   if (base.a < uAlphaCutoff) discard;
@@ -52,9 +55,13 @@ void main() {
   vec3 color = base.rgb * (0.38 + 0.8 * key * vec3(1.0, 0.96, 0.9) + 0.25 * fill * vec3(0.8, 0.88, 1.0));
   color += spec * 0.1 * vec3(1.0, 0.97, 0.9);
   color += rim * 0.16 * vec3(0.85, 0.9, 1.0);
-  gl_FragColor = vec4(min(color, vec3(1.0)), 1.0);
+  float alpha = uOpacity < 0.0 ? 1.0 : (uHasTexture ? base.a : uOpacity);
+  gl_FragColor = vec4(min(color, vec3(1.0)), alpha);
 }
 `;
+
+/** Opacity of untextured see-through meshes. */
+const GLASS_OPACITY = 0.35;
 
 interface DrawCall {
   position: WebGLBuffer;
@@ -65,6 +72,8 @@ interface DrawCall {
   indexType: number;
   texture: WebGLTexture | null;
   alphaCutoff: number;
+  /** Drawn after opaque meshes, blended, without depth writes. */
+  blend: boolean;
 }
 
 export interface ViewerModelOptions {
@@ -178,6 +187,7 @@ export class NifViewer {
         indexType,
         texture,
         alphaCutoff: texture && mesh.alphaTest ? Math.max(mesh.alphaThreshold, 0.05) : -1,
+        blend: mesh.alphaBlend,
       });
     }
     this.requestRender();
@@ -232,7 +242,18 @@ export class NifViewer {
     const aPosition = gl.getAttribLocation(this.program, 'aPosition');
     const aNormal = gl.getAttribLocation(this.program, 'aNormal');
     const aUv = gl.getAttribLocation(this.program, 'aUv');
-    for (const d of this.draws) {
+    // Opaque first, then see-through surfaces (potion glass) over them.
+    const ordered = [...this.draws.filter((d) => !d.blend), ...this.draws.filter((d) => d.blend)];
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    for (const d of ordered) {
+      if (d.blend) {
+        gl.enable(gl.BLEND);
+        gl.depthMask(false);
+      } else {
+        gl.disable(gl.BLEND);
+        gl.depthMask(true);
+      }
+      gl.uniform1f(u('uOpacity'), d.blend ? GLASS_OPACITY : -1);
       bindAttr(gl, aPosition, d.position, 3);
       bindAttr(gl, aNormal, d.normal, 3);
       bindAttr(gl, aUv, d.uv, 2);
@@ -243,6 +264,8 @@ export class NifViewer {
       gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, d.index);
       gl.drawElements(gl.TRIANGLES, d.count, d.indexType, 0);
     }
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
   }
 
   private clear(): void {

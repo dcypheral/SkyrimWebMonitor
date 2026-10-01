@@ -101,6 +101,12 @@ export function buildMapTileUrl(manifest: MapTilesManifest, row: number, col: nu
  * prefetch completes.
  */
 export const mapTileBlobUrls = new Map<string, string>();
+/**
+ * Same tiles as Blobs. The map hands these to OpenSeadragon as raw data, so
+ * it decodes them off the main thread (createImageBitmap) instead of in the
+ * middle of a pan.
+ */
+export const mapTileBlobs = new Map<string, Blob>();
 
 /** Reactive prefetch state, mirrored by the Map page UI for the backdrop. */
 export const mapTilesPrefetchActive = ref(false);
@@ -273,34 +279,16 @@ export function prefetchMapTiles(dziUrl: string): Promise<void> {
 
             if (cachedResponse && cachedResponse.ok) {
               const blob = await cachedResponse.blob();
-              const blobUrl = URL.createObjectURL(blob);
-              try {
-                const img = new Image();
-                img.decoding = 'async';
-                img.src = blobUrl;
-                await img.decode();
-              } catch {
-                // decode() can throw on some formats — ignore, the blob URL
-                // is still usable and OSD's loader will decode lazily.
-              }
-              mapTileBlobUrls.set(url, blobUrl);
+              mapTileBlobUrls.set(url, URL.createObjectURL(blob));
+              mapTileBlobs.set(url, blob);
               okCount += 1;
             } else {
               const response = await fetch(url, { cache: 'force-cache' });
               if (response.ok) {
                 const responseForCache = response.clone();
                 const blob = await response.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                try {
-                  const img = new Image();
-                  img.decoding = 'async';
-                  img.src = blobUrl;
-                  await img.decode();
-                } catch {
-                  // decode() can throw on some formats — ignore, the blob URL
-                  // is still usable and OSD's loader will decode lazily.
-                }
-                mapTileBlobUrls.set(url, blobUrl);
+                mapTileBlobUrls.set(url, URL.createObjectURL(blob));
+                mapTileBlobs.set(url, blob);
                 if (cache) {
                   await cache.put(url, responseForCache);
                 }

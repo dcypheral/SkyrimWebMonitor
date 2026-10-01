@@ -3,7 +3,6 @@ import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStor
 import { useModal } from '@/shared/lib/composables/useModal';
 import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
 import { itemBinding } from '@/stores/hotkeys/lib/bindings';
-import { DataRouter } from '@/stores/adapters/dataRouter';
 import { DropItemsModal, HotkeyPickerModal } from '@/shared/ui';
 import type { InventoryItem } from '@/stores/inventory/lib/types';
 
@@ -28,24 +27,23 @@ export function useInventoryItemActions(itemsList: () => InventoryItem[]) {
     if (!activeItem.value || !activeItemData.value) return;
     const formId = activeItem.value;
     const itemName = activeItemData.value.name;
+    // Open at once with what the app knows; the refresh updates the grid.
+    hotkeysStore.refreshFromGame();
+    const currentSlot = hotkeysStore.getSlotForFormId(formId);
 
-    wsStore.sendQuery('hotkeys.items', { items: 'Hotkey::Items' }, (fields) => {
-      DataRouter.routeDataById('hotkeys.items', fields);
-      const currentSlot = hotkeysStore.getSlotForFormId(formId);
-
-      openModal({
-        component: HotkeyPickerModal,
-        props: {
-          currentSlot,
-          itemName,
+    openModal({
+      component: HotkeyPickerModal,
+      props: {
+        currentSlot,
+        itemName,
+        formId,
+      },
+      on: {
+        select: (slot: number) => {
+          hotkeysStore.toggle(slot, itemBinding(activeItemData.value ?? undefined, formId, itemName));
+          closeModal();
         },
-        on: {
-          select: (slot: number) => {
-            hotkeysStore.toggle(slot, itemBinding(activeItemData.value ?? undefined, formId, itemName));
-            closeModal();
-          },
-        },
-      });
+      },
     });
   }
 

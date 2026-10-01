@@ -326,7 +326,12 @@
         "title": "Fast Travel",
         "message": "Travel to this location?",
         "confirm": "Yes",
-        "cancel": "No"
+        "cancel": "No",
+        "notReady": "The game is paused, loading or in a menu. Return to the game and try again.",
+        "failed": "Fast travel refused: {reason}",
+        "travelling": "Travelling to {place}…",
+        "arrived": "Arrived at {place}",
+        "noTravel": "The game did not travel. Fast travel may be blocked right now (a quest, Survival Mode or a mod)."
       },
       "prefetch": {
         "label": "Loading map",
@@ -593,7 +598,11 @@
         "hint": "Drag to turn · pinch to zoom · double-tap to reset",
         "loading": "Loading model…",
         "empty": "This model has nothing to show.",
-        "failed": "Could not load the model: {reason}"
+        "failed": "Could not load the model: {reason}",
+        "details": "Model details",
+        "noTexture": "no texture",
+        "textureOk": "texture loaded",
+        "notLoaded": "not loaded (limit)"
       }
     }
   },

@@ -59,6 +59,9 @@ uniform sampler2D uTexture;
 uniform bool uHasTexture;
 uniform vec3 uTint;
 uniform float uAlphaCutoff;
+// < 0: opaque. Otherwise the surface is alpha-blended (glass): texture alpha,
+// or this value for untextured meshes.
+uniform float uOpacity;
 void main() {
   vec4 base = uHasTexture ? texture2D(uTexture, vUv) : vec4(uTint, 1.0);
   if (base.a < uAlphaCutoff) discard;
@@ -81,7 +84,8 @@ void main() {
   vec3 color = base.rgb * (0.38 + 0.8 * key * vec3(1.0, 0.96, 0.9) + 0.25 * fill * vec3(0.8, 0.88, 1.0));
   color += spec * 0.08 * vec3(1.0, 0.97, 0.9);
   color += rim * 0.14 * vec3(0.85, 0.9, 1.0);
-  gl_FragColor = vec4(min(color, vec3(1.0)), 1.0);
+  float alpha = uOpacity < 0.0 ? 1.0 : (uHasTexture ? base.a : uOpacity);
+  gl_FragColor = vec4(min(color, vec3(1.0)), alpha);
 }
 `;
 
@@ -100,10 +104,14 @@ interface GlState {
     hasTexture: WebGLUniformLocation | null;
     tint: WebGLUniformLocation | null;
     alphaCutoff: WebGLUniformLocation | null;
+    opacity: WebGLUniformLocation | null;
   };
 }
 
 let glState: GlState | null = null;
+
+/** Opacity of untextured see-through meshes. */
+const GLASS_OPACITY = 0.35;
 
 export function isThumbnailRenderingSupported(): boolean {
   try {
@@ -179,11 +187,23 @@ export function renderNifThumbnail(model: NifModel, options: ThumbnailOptions = 
   const textureCache = new Map<string, WebGLTexture | null>();
 
   try {
-    transformed.forEach((geometry, i) => {
-      const mesh = meshes[i];
-      drawMesh(state, mesh, geometry, options.textures, textureCache, created);
-    });
+    // Opaque first, then see-through surfaces (potion glass) over them.
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    for (const pass of [false, true]) {
+      if (pass) {
+        gl.enable(gl.BLEND);
+        gl.depthMask(false);
+      }
+      transformed.forEach((geometry, i) => {
+        const mesh = meshes[i];
+        if (mesh.alphaBlend !== pass) return;
+        gl.uniform1f(locations.opacity, pass ? GLASS_OPACITY : -1);
+        drawMesh(state, mesh, geometry, options.textures, textureCache, created);
+      });
+    }
   } finally {
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
     for (const b of created.buffers) gl.deleteBuffer(b);
     for (const t of created.textures) gl.deleteTexture(t);
   }
@@ -224,6 +244,7 @@ function getGl(): GlState | null {
       hasTexture: gl.getUniformLocation(program, 'uHasTexture'),
       tint: gl.getUniformLocation(program, 'uTint'),
       alphaCutoff: gl.getUniformLocation(program, 'uAlphaCutoff'),
+      opacity: gl.getUniformLocation(program, 'uOpacity'),
     },
   };
   return glState;

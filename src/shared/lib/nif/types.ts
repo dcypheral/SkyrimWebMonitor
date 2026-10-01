@@ -15,6 +15,8 @@ export interface NifMesh {
   alphaTest: boolean;
   /** Alpha test threshold, 0..1. */
   alphaThreshold: number;
+  /** NiAlphaProperty blending: see-through surfaces such as potion glass. */
+  alphaBlend: boolean;
 }
 
 /**

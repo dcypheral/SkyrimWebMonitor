@@ -13,7 +13,7 @@
     </div>
 
     <hotkey-slots-grid
-      :active-slot="currentSlot"
+      :active-slot="activeSlot"
       gap="sm"
       class="hotkey-picker-grid"
       @select="handleSlotClick"
@@ -22,17 +22,25 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useHotkeysStore } from '@/stores/hotkeys/useHotkeysStore';
 import HotkeySlotsGrid from '../hotkey-slots-grid/HotkeySlotsGrid.vue';
 
 interface Props {
   currentSlot?: number | null;
   itemName?: string | null;
+  /** When given, the highlighted slot follows the live hotkey data. */
+  formId?: string | null;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   currentSlot: null,
   itemName: null,
+  formId: null,
 });
+
+const hotkeys = useHotkeysStore();
+const activeSlot = computed(() => (props.formId ? hotkeys.getSlotForFormId(props.formId) : props.currentSlot));
 
 const emit = defineEmits<{
   select: [slot: number];

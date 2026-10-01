@@ -94,6 +94,7 @@ import {
   RAD_TO_DEG,
 } from '../constants';
 import FastTravelModal from '../fast-travel-modal/FastTravelModal.vue';
+import { fastTravelTo } from '../lib/fastTravel';
 import LocationMarkers from '../components/location-markers/LocationMarkers.vue';
 import QuestMarkers from '../components/quest-markers/QuestMarkers.vue';
 import PlayerMarker from '../components/player-marker/PlayerMarker.vue';
@@ -103,7 +104,6 @@ import { useNoteActions } from '@/features/journey';
 import { isLocationMarker, isQuestMarker, type ProjectedMarker } from '../lib/types';
 import { useMapHotspotsStore } from '@/stores/map/useMapHotspotsStore';
 import { useMapPlayerStore } from '@/stores/map/useMapPlayerStore';
-import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useModal } from '@/shared/lib/composables/useModal';
 
 void [LocationMarkers, QuestMarkers, PlayerMarker, SelectedMarkerLabel, JourneyLayer];
@@ -184,7 +184,6 @@ const selectedMarker = computed<ProjectedMarker | null>(() => {
 });
 
 const { openModal, closeModal } = useModal();
-const wsStore = useWebSocketStore();
 
 function onMarkerClick(m: ProjectedMarker): void {
   if (selectedMarkerKey.value !== m.key) {
@@ -202,7 +201,7 @@ function onMarkerClick(m: ProjectedMarker): void {
       confirm: () => {
         // Trigger fast-travel to the selected map marker. The marker's
         // `refId` is the hex form ID expected by the protocol.
-        wsStore.sendCommand({ command: 'fast_travel', formId: m.refId });
+        fastTravelTo(m.refId, m.label);
         closeModal();
       },
       cancel: () => {

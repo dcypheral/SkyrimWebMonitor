@@ -11,6 +11,17 @@
         <header class="viewer__head">
           <span class="viewer__name">{{ current.name }}</span>
           <button
+            v-if="details.length"
+            type="button"
+            class="viewer__close"
+            :class="{ 'viewer__info--on': showDetails }"
+            :aria-label="t('shared.ui.viewer.details')"
+            :aria-pressed="showDetails"
+            @click="showDetails = !showDetails"
+          >
+            i
+          </button>
+          <button
             type="button"
             class="viewer__close"
             :aria-label="t('shared.ui.viewer.close')"
@@ -29,6 +40,22 @@
           @pointercancel="onUp"
           @wheel.prevent="onWheel"
         />
+
+        <ul
+          v-if="showDetails"
+          class="viewer__details"
+        >
+          <li
+            v-for="(d, i) in details"
+            :key="i"
+          >
+            <span class="viewer__details-name">{{ d.name || `#${i + 1}` }}</span>
+            <span>{{ d.texture ?? t('shared.ui.viewer.noTexture') }}</span>
+            <span :class="{ 'viewer__details-bad': d.state !== 'ok' && d.state !== '' }">
+              {{ d.state === 'ok' ? t('shared.ui.viewer.textureOk') : d.state }}{{ d.blend ? ' · blend' : '' }}{{ d.test ? ' · cut-out' : '' }}
+            </span>
+          </li>
+        </ul>
 
         <p
           v-if="status"
@@ -69,6 +96,9 @@ const system = useSystemStore();
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 const status = ref('');
+/** Per-mesh texture diagnostics ("i" button): why a model looks untextured. */
+const details = ref<Array<{ name: string; texture: string | null; state: string; blend: boolean; test: boolean }>>([]);
+const showDetails = ref(false);
 let viewer: NifViewer | null = null;
 let loadToken = 0;
 
@@ -84,6 +114,8 @@ function decode(src: string): Promise<HTMLImageElement | null> {
 async function load(request: ModelViewerRequest): Promise<void> {
   const token = ++loadToken;
   status.value = t('shared.ui.viewer.loading');
+  details.value = [];
+  showDetails.value = false;
   await nextTick();
   if (!canvas.value) return;
   try {
@@ -92,6 +124,7 @@ async function load(request: ModelViewerRequest): Promise<void> {
     const file = await ws.downloadFile(request.modelPath);
     const model = parseNif(base64ToBytes(file.dataBase64));
     const textures = new Map<string, ThumbnailTextureSource>();
+    const textureState = new Map<string, string>();
     if (system.isFeatureProvided(FEATURES.TEXTURE_PREVIEW)) {
       const withSize = system.isFeatureProvided(FEATURES.TEXTURE_PREVIEW_MAX_SIZE);
       const paths = [...new Set(model.meshes.map((m) => m.diffuseTexture).filter((p): p is string => !!p))].slice(0, MAX_TEXTURES);
@@ -101,13 +134,22 @@ async function load(request: ModelViewerRequest): Promise<void> {
             const preview = await ws.texturePreview(path, withSize ? TEXTURE_SIZE : undefined);
             const img = await decode(`data:${preview.mimeType};base64,${preview.imageBase64}`);
             if (img) textures.set(path, img);
-          } catch {
-            /* missing texture: material tint instead */
+            textureState.set(path, img ? 'ok' : 'decode failed');
+          } catch (err) {
+            // Missing or unsupported texture: material tint instead.
+            textureState.set(path, err instanceof Error ? err.message : String(err));
           }
         }),
       );
     }
     if (token !== loadToken || !viewer) return;
+    details.value = model.meshes.map((m) => ({
+      name: m.name,
+      texture: m.diffuseTexture,
+      state: m.diffuseTexture ? (textureState.get(m.diffuseTexture) ?? t('shared.ui.viewer.notLoaded')) : '',
+      blend: m.alphaBlend,
+      test: m.alphaTest,
+    }));
     const tint = getItemMaterial(request.keywords).rgb;
     const ok = viewer.setModel(model, { textures, tint, framing: request.framing });
     status.value = ok ? '' : t('shared.ui.viewer.empty');
@@ -259,5 +301,44 @@ onBeforeUnmount(() => viewer?.dispose());
 .viewer-enter-from,
 .viewer-leave-to {
   opacity: 0;
+}
+
+.viewer__info--on {
+  border-color: var(--skyrim-accent-main);
+  color: var(--skyrim-accent-main);
+}
+
+.viewer__details {
+  position: absolute;
+  top: 52px;
+  right: 8px;
+  left: 8px;
+  z-index: 1;
+  max-height: 45%;
+  margin: 0;
+  overflow-y: auto;
+  padding: 8px 10px;
+  list-style: none;
+  background: rgb(0 0 0 / 80%);
+  border: 1px solid var(--skyrim-border-medium);
+  border-radius: var(--radius-md);
+  font-size: 0.68rem;
+  color: var(--skyrim-text-secondary);
+
+  li {
+    display: flex;
+    flex-direction: column;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--skyrim-border-dark);
+    overflow-wrap: anywhere;
+  }
+}
+
+.viewer__details-name {
+  color: var(--skyrim-text-primary);
+}
+
+.viewer__details-bad {
+  color: #e8a060;
 }
 </style>

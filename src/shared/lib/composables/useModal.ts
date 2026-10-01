@@ -10,8 +10,16 @@ const openedAtMs = ref(0);
 const ghostClickGuardMs = ref(0);
 const placement = ref<'center' | 'top'>('center');
 let onCloseCallback: (() => void) | null = null;
+/** Clears the closed modal's content after the close animation. */
+let cleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
 function openModal(options: ModalOptions) {
+  // A modal opened within 300 ms of a close must not lose its content to the
+  // previous close's cleanup (that left an empty, thin modal frame).
+  if (cleanupTimer) {
+    clearTimeout(cleanupTimer);
+    cleanupTimer = null;
+  }
   modalComponent.value = options.component;
   modalProps.value = options.props ?? {};
   modalHandlers.value = options.on ?? {};
@@ -29,7 +37,10 @@ function closeModal() {
     onCloseCallback();
     onCloseCallback = null;
   }
-  setTimeout(() => {
+  if (cleanupTimer) clearTimeout(cleanupTimer);
+  cleanupTimer = setTimeout(() => {
+    cleanupTimer = null;
+    if (isOpen.value) return;
     modalComponent.value = null;
     modalProps.value = {};
     modalHandlers.value = {};

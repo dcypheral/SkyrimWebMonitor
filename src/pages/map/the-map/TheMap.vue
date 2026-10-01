@@ -16,6 +16,12 @@
         :overlay-style="overlayStyle"
         :project-world-to-image="projectWorldToImage"
         :current-worldspace="currentMapWorldspace"
+        :class="{ 'map-overlay--moving': isMoving }"
+      />
+      <!-- Torn paper edge, drawn once on top instead of masking the moving map. -->
+      <div
+        class="map-frame"
+        aria-hidden="true"
       />
       <div class="map-layer-controls">
         <button
@@ -125,7 +131,7 @@ import { storeToRefs } from 'pinia';
 import OpenSeadragon from 'openseadragon';
 import {
   prefetchMapTiles,
-  mapTileBlobUrls,
+  mapTileBlobs,
   mapTilesPrefetchActive,
   mapTilesPrefetchProgress,
 } from '../preloadMap';
@@ -168,6 +174,7 @@ const ZOOM_BUTTON_STEP = 1.8;
 const FOCUS_ZOOM_FACTOR = 8;
 /** Background color around the map. */
 const BACKGROUND_COLOR = 'var(--skyrim-bg-medium)';
+const MAX_MAP_PIXEL_DENSITY = 2;
 
 // =============================================================
 // Torn-paper edge effect (unchanged)
@@ -179,7 +186,6 @@ const TEAR_BASE_FREQUENCY = 0.045;
 const TEAR_OCTAVES = 2;
 const TEAR_DISPLACEMENT = 32;
 const TEAR_SEED = 4;
-const TEAR_SHADOW = '0 4px 14px rgba(0, 0, 0, 0.55)';
 
 const TEAR_MASK_URL = (() => {
   const inner = TEAR_VIEWBOX - 2 * TEAR_INSET;
@@ -218,6 +224,8 @@ const scale = ref(0);
  */
 const markerScale = ref(0);
 let isAnimating = false;
+/** True during OSD animations (pans, flings, zooms). */
+const isMoving = ref(false);
 const translateX = ref(0);
 const translateY = ref(0);
 const containerWidth = ref(0);
@@ -380,6 +388,28 @@ function toggleFollowPlayerMode(): void {
  * internal tile-cache evictions don't cost a thing because re-loading from
  * a blob URL is instant.
  */
+let densityCapped = false;
+
+/** OSD reads the density once and again on window resize; clamp both. */
+function capOsdPixelDensity(): void {
+  if (densityCapped) return;
+  const original: unknown = Reflect.get(OpenSeadragon, 'getCurrentPixelDensityRatio');
+  if (typeof original !== 'function') return;
+  const capped = (): number => {
+    const value: unknown = Reflect.apply(original, OpenSeadragon, []);
+    return Math.min(typeof value === 'number' ? value : 1, MAX_MAP_PIXEL_DENSITY);
+  };
+  Reflect.set(OpenSeadragon, 'getCurrentPixelDensityRatio', capped);
+  Reflect.set(OpenSeadragon, 'pixelDensityRatio', capped());
+  densityCapped = true;
+}
+
+/** The part of OpenSeadragon's ImageJob that the tile loader uses. */
+interface TileJob {
+  src: string;
+  finish: (data: unknown, request: unknown, dataType: string) => void;
+}
+
 function attachSharedTileCache(item: OpenSeadragon.TiledImage): void {
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const source = item.source as OpenSeadragon.TileSource & {
@@ -393,9 +423,23 @@ function attachSharedTileCache(item: OpenSeadragon.TiledImage): void {
   const originalGetTileUrl = source.getTileUrl.bind(source);
   source.getTileUrl = (level: number, x: number, y: number): string => {
     const raw = originalGetTileUrl(level, x, y);
-    const realUrl = typeof raw === 'function' ? raw() : raw;
-    return mapTileBlobUrls.get(realUrl) ?? realUrl;
+    return typeof raw === 'function' ? raw() : raw;
   };
+
+  // Cached tiles go to OpenSeadragon as raw Blobs ("rasterBlob"): it then
+  // decodes them with createImageBitmap, off the main thread. Loading them
+  // as <img> decoded each 512 px tile on the main thread during pans.
+  const originalDownload: unknown = Reflect.get(source, 'downloadTileStart');
+  if (typeof originalDownload === 'function') {
+    const fallback = (job: TileJob): void => {
+      Reflect.apply(originalDownload, source, [job]);
+    };
+    Reflect.set(source, 'downloadTileStart', (job: TileJob) => {
+      const blob = mapTileBlobs.get(job.src);
+      if (blob) job.finish(blob, null, 'rasterBlob');
+      else fallback(job);
+    });
+  }
 
   // Make sure the background prefetch is running. Idempotent: a no-op if it
   // was already started by useAppLoader.
@@ -509,6 +553,11 @@ async function setupViewer(): Promise<void> {
 
   const config = mapConfig.value;
   const tileSources = await detectTileSource(config);
+
+  // Draw the map at most at 2 device pixels per CSS pixel. The handheld's
+  // 2.6× screen otherwise makes every frame fill ~70 % more pixels for a
+  // difference that is hard to see on a map texture.
+  capOsdPixelDensity();
 
   viewer = OpenSeadragon({
     // 2D canvas drawer. OSD's default WebGL drawer renders into its own GL
@@ -626,9 +675,11 @@ async function setupViewer(): Promise<void> {
   viewer.addHandler('update-viewport', syncOverlayTransform);
   viewer.addHandler('animation-start', () => {
     isAnimating = true;
+    isMoving.value = true;
   });
   viewer.addHandler('animation-finish', () => {
     isAnimating = false;
+    isMoving.value = false;
     settleMarkerScale();
   });
   viewer.addHandler('resize', () => {
@@ -745,10 +796,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped lang="scss">
-/*
-  .map-outer hosts the torn-paper shadow on a static ::before, so the
-  animated OSD canvas underneath stays on its own GPU layer.
-*/
 .map-outer {
   position: relative;
   flex: 1 1 auto;
@@ -756,21 +803,6 @@ onBeforeUnmount(() => {
   height: 100%;
   min-height: 0;
   background-color: v-bind(BACKGROUND_COLOR);
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-color: v-bind(BACKGROUND_COLOR);
-    -webkit-mask-image: v-bind(TEAR_MASK_URL);
-    mask-image: v-bind(TEAR_MASK_URL);
-    -webkit-mask-size: 100% 100%;
-    mask-size: 100% 100%;
-    -webkit-mask-repeat: no-repeat;
-    mask-repeat: no-repeat;
-    filter: drop-shadow(v-bind(TEAR_SHADOW));
-  }
 }
 
 .map-page {
@@ -778,12 +810,6 @@ onBeforeUnmount(() => {
   inset: 0;
   overflow: hidden;
   background-color: v-bind(BACKGROUND_COLOR);
-  -webkit-mask-image: v-bind(TEAR_MASK_URL);
-  mask-image: v-bind(TEAR_MASK_URL);
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -792,6 +818,35 @@ onBeforeUnmount(() => {
 .osd-host {
   position: absolute;
   inset: 0;
+}
+
+/*
+ * The torn edge used to be a mask on .map-page, which made the browser
+ * re-composite the mask with the moving map on every frame. This static
+ * frame covers the same edge area (inverse of the paper shape) and never
+ * changes, so it is drawn once.
+ */
+.map-frame {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background-color: v-bind(BACKGROUND_COLOR);
+  -webkit-mask-image: linear-gradient(#000, #000), v-bind(TEAR_MASK_URL);
+  mask-image: linear-gradient(#000, #000), v-bind(TEAR_MASK_URL);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 5px rgb(0 0 0 / 60%));
+}
+
+/* While the map moves, keep the marker layer's raster instead of
+   re-rasterizing the full-map SVG at every intermediate zoom. */
+.map-overlay--moving {
+  will-change: transform;
 }
 
 .map-overlay {
