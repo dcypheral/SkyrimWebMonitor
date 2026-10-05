@@ -3,6 +3,28 @@ import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { onMounted, onUnmounted, ref } from 'vue';
 
 /**
+ * Overlays that close on the system back button. The newest handler runs
+ * first; returning true means it handled the press.
+ */
+const backHandlers: Array<() => boolean> = [];
+
+/** Registers a back handler; call the returned function to remove it. */
+export function pushBackHandler(handler: () => boolean): () => void {
+  backHandlers.push(handler);
+  return () => {
+    const i = backHandlers.lastIndexOf(handler);
+    if (i >= 0) backHandlers.splice(i, 1);
+  };
+}
+
+function runBackHandlers(): boolean {
+  for (let i = backHandlers.length - 1; i >= 0; i--) {
+    if (backHandlers[i]?.()) return true;
+  }
+  return false;
+}
+
+/**
  * Android-style "press back again to exit" guard.
  *
  * On the first system back gesture/button we show a transient hint and
@@ -87,6 +109,10 @@ export function useBackGuard() {
   }
 
   function handleBackAttempt() {
+    if (runBackHandlers()) {
+      if (!isNativeCapacitor) pushDummyState();
+      return;
+    }
     if (showToast.value) {
       // Second back press within the timeout window — exit.
       closeApp();

@@ -22,6 +22,7 @@
     <connection-status v-else />
     <skyrim-modal />
     <model-viewer-overlay />
+    <guide-reader v-if="guideReaderOpen" />
     <game-status-backdrop />
     <combat-indicator />
     <exit-toast :visible="showToast" />
@@ -31,7 +32,7 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { computed } from 'vue';
+import { computed, defineAsyncComponent, ref, watch } from 'vue';
 import { SkyrimNavigation, SkyrimContent, SkyrimDock, OfflinePill } from '@/app/ui';
 import {
   ConnectionStatus,
@@ -44,6 +45,7 @@ import {
 import { useNavigationStore } from '@/stores/use-navigation-store/useNavigationStore';
 import { useWebSocketStore } from '@/stores/use-websocket-store/useWebsocketStore';
 import { useOfflineStore } from '@/stores/offline/useOfflineStore';
+import { useGuideStore } from '@/stores/guide/useGuideStore';
 import { useAppLoader } from '@/app/lib/composables/useAppLoader';
 import { ModelViewerOverlay } from '@/entities/ui/icons';
 import { useBackGuard } from '@/shared/lib/composables/useBackGuard';
@@ -59,6 +61,18 @@ const { isConnected } = storeToRefs(websocketStore);
 const offline = useOfflineStore();
 const { hasSnapshot, wantsConnectScreen } = storeToRefs(offline);
 const showMain = computed(() => isConnected.value || (hasSnapshot.value && !wantsConnectScreen.value));
+
+// The reader (and pdf.js with it) loads only when a guide page is opened.
+const GuideReader = defineAsyncComponent(() => import('@/features/guide/ui/guide-reader/GuideReader.vue'));
+const guideStore = useGuideStore();
+// Stays mounted after the first open so closing can animate.
+const guideReaderOpen = ref(false);
+watch(
+  () => guideStore.reader.open,
+  (open) => {
+    if (open) guideReaderOpen.value = true;
+  },
+);
 
 useAppLoader();
 installCompanionMode();

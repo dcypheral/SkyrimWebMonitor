@@ -62,6 +62,7 @@
     "idb": "^7.1.1",
     "leaflet": "^1.9.4",
     "opentype.js": "^2.0.0",
+    "pdfjs-dist": "^6.4.299",
     "pinia": "^3.0.4",
     "vite-plugin-pwa": "^1.2.0",
     "vue": "^3.5.32",

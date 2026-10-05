@@ -6,6 +6,7 @@
     <item-thumbnails-settings />
     <journey-settings />
     <home-map-settings />
+    <guide-settings />
     <gfx-fonts-settings />
     <display-controls :teleport="false" />
     <performance-settings />
@@ -21,5 +22,6 @@ import ItemThumbnailsSettings from '../item-thumbnails-settings/ItemThumbnailsSe
 import GfxFontsSettings from '../gfx-fonts-settings/GfxFontsSettings.vue';
 import JourneySettings from '../journey-settings/JourneySettings.vue';
 import HomeMapSettings from '../home-map-settings/HomeMapSettings.vue';
+import GuideSettings from '../guide-settings/GuideSettings.vue';
 import PerformanceSettings from '../performance-settings/PerformanceSettings.vue';
 </script>

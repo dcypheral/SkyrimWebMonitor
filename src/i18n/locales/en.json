@@ -131,6 +131,9 @@
         "colAvg": "avg ms",
         "colMax": "max ms",
         "colSlow": ">4 ms"
+      },
+      "guide": {
+        "title": "Strategy guide"
       }
     },
     "offline": {
@@ -306,6 +309,50 @@
         "unknown": "Unknown quest",
         "sections": {
           "misc": "Misc"
+        },
+        "back": "Back to quests",
+        "tracked": "Tracked",
+        "track": "Track",
+        "objectives": "Objectives",
+        "filters": {
+          "active": "Active",
+          "misc": "Misc",
+          "done": "Done"
+        },
+        "empty": {
+          "active": "No active quests.",
+          "misc": "No miscellaneous tasks.",
+          "done": "No finished quests yet."
+        },
+        "lines": {
+          "main": "Main quest",
+          "civilWar": "Civil War",
+          "companions": "Companions",
+          "college": "College of Winterhold",
+          "thieves": "Thieves Guild",
+          "brotherhood": "Dark Brotherhood",
+          "daedric": "Daedric",
+          "dawnguard": "Dawnguard",
+          "dragonborn": "Dragonborn",
+          "side": "Side quests",
+          "misc": "Miscellaneous"
+        },
+        "guide": {
+          "title": "Strategy guide",
+          "open": "Open in guide",
+          "also": "Also:",
+          "resetLink": "Remove my link",
+          "linkHint": "Not the right page? Find it in the guide and tap “Link page”.",
+          "notFound": "No bookmark for this quest",
+          "stillIndexing": "Reading the guide's text: {done} of {total} pages. Matches can still appear.",
+          "search": "Search the guide",
+          "browse": "Browse",
+          "source": {
+            "link": "Your link",
+            "bookmark": "Guide bookmark",
+            "text": "Likely page",
+            "section": "Guide section"
+          }
         }
       }
     },
@@ -608,6 +655,53 @@
       },
       "hotkeys": {
         "failed": "Hotkey not set: {reason}"
+      },
+      "guide": {
+        "title": "Strategy guide",
+        "close": "Close guide",
+        "drawer": "Contents, marks and search",
+        "tabs": {
+          "contents": "Contents",
+          "marks": "Marks",
+          "search": "Search"
+        },
+        "noMarks": "No bookmarks or highlights yet. Use the ribbon to bookmark a page and the marker to highlight.",
+        "searchPlaceholder": "Search the guide text",
+        "indexing": "Reading the guide's text: {done} of {total} pages",
+        "noResults": "Nothing found.",
+        "resultCount": "Results: {n}",
+        "goToPage": "Go to page",
+        "addBookmark": "Bookmark this page",
+        "removeBookmark": "Remove bookmark",
+        "bookmarkAdded": "Bookmarked page {page}",
+        "bookmarkRemoved": "Bookmark removed",
+        "highlight": "Highlight",
+        "highlighter": "Highlighter",
+        "drawHint": "Drag over the page to highlight",
+        "colors": {
+          "amber": "Amber",
+          "green": "Green",
+          "blue": "Blue",
+          "rose": "Rose"
+        },
+        "notePlaceholder": "Add a note…",
+        "done": "Done",
+        "linked": "Linked",
+        "linkPage": "Link page",
+        "linkedToast": "{quest} → page {page}",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "openFailed": "Could not open the guide",
+        "fileMeta": "{pages} pages · {size}",
+        "notPersisted": "The app could not keep a copy (storage full?). Pick the file again next time.",
+        "indexReady": "Text search ready.",
+        "replace": "Replace…",
+        "remove": "Remove",
+        "removeConfirm": "Tap again to remove",
+        "opening": "Opening the guide",
+        "pitch": "Link your own PDF copy of the Prima Skyrim Legendary Edition guide. Each quest then opens on its walkthrough, and you can bookmark and highlight pages.",
+        "choose": "Choose guide PDF",
+        "privacy": "The PDF is not part of the app. It stays on this device."
       }
     }
   },

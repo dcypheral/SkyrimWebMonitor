@@ -66,6 +66,8 @@ const UNGATED_COMMANDS: ReadonlySet<string> = new Set([
   'favorite',
   'favorite_spell',
   'favorite_shout',
+  // Journal tracking is what the in-game journal menu does while paused.
+  'quest_set_active',
 ]);
 
 export const useWebSocketStore = defineStore('websocket', () => {

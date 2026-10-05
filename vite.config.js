@@ -162,7 +162,7 @@ export default defineConfig(({ mode }) => {
           // browser will swap caches automatically on next visit
           // (autoUpdate + skipWaiting + clientsClaim + cleanupOutdatedCaches).
           globPatterns: [
-            '**/*.{js,css,html,ico,png,jpg,svg,webp,webmanifest,woff,woff2,ttf,otf,eot}',
+            '**/*.{js,mjs,css,html,ico,png,jpg,svg,webp,webmanifest,woff,woff2,ttf,otf,eot}',
             'map-dzi/**/*.dzi',
             ...USED_ICONS.map((p) => `icons/${p}`),
           ],
