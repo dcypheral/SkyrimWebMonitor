@@ -6,7 +6,7 @@
  * document per batch and destroys it afterwards: memory stays at one batch
  * of pages, and the reader's document is not slowed down by it.
  */
-import { openBlobPdf, readPageText } from '@/shared/lib/guide/pdfDocument';
+import { closePdf, openBlobPdf, readPageText } from '@/shared/lib/guide/pdfDocument';
 import type { GuidePageText } from '@/shared/lib/guide/pageText';
 
 export type IndexedPage = GuidePageText & { width: number; height: number };
@@ -51,7 +51,7 @@ export async function runIndexer(options: IndexerOptions): Promise<void> {
       }
       if (pending.length) await onPages(pending, page);
     } finally {
-      await doc.loadingTask.destroy();
+      await closePdf(doc);
     }
   }
 }

@@ -9,7 +9,7 @@ import { fold } from '@/shared/lib/guide/ocrText';
 import { outlinePath, sectionAt, type GuideOutlineEntry } from '@/shared/lib/guide/outline';
 import { foldPage, searchPages, type FoldedPage, type GuidePageText, type SearchHit } from '@/shared/lib/guide/pageText';
 import { matchBookmarks, matchText, type QuestRef } from '@/shared/lib/guide/questMatch';
-import { guideFingerprint, openBlobPdf, readOutline, type PDFDocumentProxy } from '@/shared/lib/guide/pdfDocument';
+import { closePdf, guideFingerprint, openBlobPdf, readOutline, type PDFDocumentProxy } from '@/shared/lib/guide/pdfDocument';
 import * as db from './lib/guideDb';
 import { runIndexer, type IndexedPage } from './lib/textIndexer';
 import type {
@@ -102,7 +102,7 @@ export const useGuideStore = defineStore('guide', () => {
 
   function resetState(): void {
     stopIndexer();
-    void docPromise?.then((d) => d.loadingTask.destroy()).catch(() => undefined);
+    void docPromise?.then((d) => closePdf(d)).catch(() => undefined);
     docPromise = null;
     blob = null;
     meta = null;

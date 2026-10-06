@@ -131,6 +131,10 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // The pdf.js worker is an ES module (it uses import.meta.url).
+    worker: {
+      format: 'es',
+    },
     plugins: [
       vue(),
       // Must run BEFORE VitePWA so workbox sees only the pruned icon set.

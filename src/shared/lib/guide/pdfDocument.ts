@@ -5,6 +5,7 @@
  *
  * The legacy build is used because the app supports Chrome 90 WebViews.
  */
+import './pdfPolyfills';
 import type * as PdfJsModule from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type { PDFDocumentProxy } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { flattenOutline, type GuideOutlineEntry, type RawOutlineNode } from './outline';
@@ -19,13 +20,7 @@ let pdfjsPromise: Promise<PdfJs> | null = null;
 
 export function loadPdfJs(): Promise<PdfJs> {
   if (!pdfjsPromise) {
-    pdfjsPromise = Promise.all([
-      import('pdfjs-dist/legacy/build/pdf.mjs'),
-      import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'),
-    ]).then(([pdfjs, worker]) => {
-      pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-      return pdfjs;
-    });
+    pdfjsPromise = import('pdfjs-dist/legacy/build/pdf.mjs');
     pdfjsPromise.catch(() => {
       pdfjsPromise = null;
     });
@@ -33,11 +28,16 @@ export function loadPdfJs(): Promise<PdfJs> {
   return pdfjsPromise;
 }
 
+/** Worker thread of each open document, ended by `closePdf`. */
+const workers = new WeakMap<PDFDocumentProxy, { worker: { destroy(): void }; thread: Worker }>();
+
 export type { PDFDocumentProxy };
 
 /** Opens a PDF stored as a Blob. Each call gets its own pdf.js worker. */
 export async function openBlobPdf(blob: Blob): Promise<PDFDocumentProxy> {
   const pdfjs = await loadPdfJs();
+  const thread = new Worker(new URL('./pdfWorker.ts', import.meta.url), { type: 'module' });
+  const worker = pdfjs.PDFWorker.create({ port: thread });
   const head = new Uint8Array(await blob.slice(0, Math.min(CHUNK, blob.size)).arrayBuffer());
   const transport = new pdfjs.PDFDataRangeTransport(blob.size, head);
   transport.requestDataRange = (begin: number, end: number) => {
@@ -47,14 +47,34 @@ export async function openBlobPdf(blob: Blob): Promise<PDFDocumentProxy> {
       .then((buf) => transport.onDataRange(begin, new Uint8Array(buf)))
       .catch((err: unknown) => console.warn('[Guide] Range read failed', begin, end, err));
   };
-  return pdfjs.getDocument({
+  const task = pdfjs.getDocument({
+    worker,
     range: transport,
     rangeChunkSize: CHUNK,
     disableAutoFetch: true,
     disableStream: true,
     // Only errors: the scan's invisible OCR font logs a warning per page.
     verbosity: 0,
-  }).promise;
+  });
+  try {
+    const doc = await task.promise;
+    workers.set(doc, { worker, thread });
+    return doc;
+  } catch (err) {
+    await task.destroy().catch(() => undefined);
+    worker.destroy();
+    thread.terminate();
+    throw err;
+  }
+}
+
+/** Closes a document from `openBlobPdf` and ends its worker thread. */
+export async function closePdf(doc: PDFDocumentProxy): Promise<void> {
+  await doc.loadingTask.destroy().catch(() => undefined);
+  const w = workers.get(doc);
+  workers.delete(doc);
+  w?.worker.destroy();
+  w?.thread.terminate();
 }
 
 /** Stable id of a guide file: pdf.js fingerprint plus byte size. */

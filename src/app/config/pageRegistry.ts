@@ -417,12 +417,14 @@ export const pagesRegistry: PagesRegistry = {
       component: TheQuests,
       subscriptions: [
         {
+          // Quest list reads run on the game thread; only changes are sent.
           id: 'quests.questsList',
           fields: {
             quests: 'Player::Quests',
           },
           settings: {
-            frequency: INVENTORY_FREQUENCY,
+            frequency: 1000,
+            sendOnChange: true,
           },
         },
       ],
